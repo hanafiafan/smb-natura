@@ -1,4 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import { getSession } from "@/lib/session";
+import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { computePeriods, type PeriodMode } from "@/lib/period";
@@ -18,9 +20,8 @@ function toRow(r: PnLRow, omsetA: number, omsetB: number): (string | number)[] {
 }
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
+  const session = await getSession();
+  if (!session.email) return new Response("Unauthorized", { status: 401 });
 
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const mode = (sp.mode ?? "monthly") as PeriodMode;
@@ -30,19 +31,17 @@ export async function GET(request: Request) {
   const min = periodA.start < periodB.start ? periodA.start : periodB.start;
   const max = periodA.end > periodB.end ? periodA.end : periodB.end;
 
-  const [accountsRes, txnsQuery] = await Promise.all([
-    supabase.from("accounts").select("*").eq("is_active", true).order("sort_order", { ascending: true }),
-    (async () => {
-      let q = supabase.from("transactions").select("account_id, txn_date, amount, branch_id").gte("txn_date", min).lte("txn_date", max);
-      if (branchId) q = q.eq("branch_id", branchId);
-      return await q;
-    })(),
+  const [accounts, txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where is_active = true order by sort_order asc`,
+    sql<{ account_id: number; txn_date: string; amount: number; branch_id: number }[]>`
+      select account_id, txn_date, amount, branch_id from transactions
+      where txn_date >= ${min} and txn_date <= ${max}
+      ${branchId ? sql`and branch_id = ${branchId}` : sql``}
+    `,
   ]);
-  if (accountsRes.error) return new Response(accountsRes.error.message, { status: 500 });
-  if (txnsQuery.error) return new Response(txnsQuery.error.message, { status: 500 });
 
-  const aggs = aggregate(txnsQuery.data ?? [], periodA, periodB);
-  const pnl = buildPnL(accountsRes.data ?? [], aggs);
+  const aggs = aggregate(txns, periodA, periodB);
+  const pnl = buildPnL(accounts, aggs);
   const omsetA = pnl.totals.netRevenue[0];
   const omsetB = pnl.totals.netRevenue[1];
 

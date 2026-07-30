@@ -1,5 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Account, Database } from "@/lib/database.types";
+import { sql } from "@/lib/db";
+import type { Account, TransactionWithRelations } from "@/lib/database.types";
 
 export type TxnFilters = {
   start: string;
@@ -11,29 +11,42 @@ export type TxnFilters = {
 };
 
 /** Filter query bersama untuk list & export — satu tempat supaya perilaku filter selalu konsisten. */
-export function buildTransactionsQuery(
-  supabase: SupabaseClient<Database>,
-  sp: TxnFilters,
+export async function queryTransactions(
+  filters: TxnFilters,
   accounts: Account[],
-) {
-  let query = supabase
-    .from("transactions")
-    .select("*, accounts(code, name, section, category), branches(name)", { count: "exact" })
-    .gte("txn_date", sp.start)
-    .lte("txn_date", sp.end)
-    .order("txn_date", { ascending: false })
-    .order("created_at", { ascending: false });
+  pagination?: { limit: number; offset: number },
+): Promise<{ rows: TransactionWithRelations[]; count: number }> {
+  const conditions = [sql`t.txn_date >= ${filters.start}`, sql`t.txn_date <= ${filters.end}`];
 
-  if (sp.account_id) query = query.eq("account_id", Number(sp.account_id));
-  if (sp.branch_id) query = query.eq("branch_id", Number(sp.branch_id));
-  // Strip characters that break PostgREST's or() filter list syntax (, ( ))
-  const q = sp.q?.replace(/[,()]/g, "").trim();
-  if (q) query = query.or(`description.ilike.%${q}%,reference.ilike.%${q}%`);
-  if (sp.category) {
-    const idsInCat = accounts.filter((a) => (a.category ?? "") === sp.category).map((a) => a.id);
-    if (idsInCat.length === 0) idsInCat.push(-1);
-    query = query.in("account_id", idsInCat);
+  if (filters.account_id) conditions.push(sql`t.account_id = ${Number(filters.account_id)}`);
+  if (filters.branch_id) conditions.push(sql`t.branch_id = ${Number(filters.branch_id)}`);
+
+  const q = filters.q?.trim();
+  if (q) conditions.push(sql`(t.description ilike ${"%" + q + "%"} or t.reference ilike ${"%" + q + "%"})`);
+
+  if (filters.category) {
+    const idsInCat = accounts.filter((a) => (a.category ?? "") === filters.category).map((a) => a.id);
+    conditions.push(idsInCat.length ? sql`t.account_id in ${sql(idsInCat)}` : sql`false`);
   }
 
-  return query;
+  const where = conditions.reduce((acc, c) => sql`${acc} and ${c}`);
+
+  const [{ count }] = await sql<{ count: number }[]>`
+    select count(*)::int as count from transactions t where ${where}
+  `;
+
+  const rows = await sql<TransactionWithRelations[]>`
+    select
+      t.*,
+      json_build_object('code', a.code, 'name', a.name, 'section', a.section, 'category', a.category) as accounts,
+      json_build_object('name', b.name) as branches
+    from transactions t
+    join accounts a on a.id = t.account_id
+    join branches b on b.id = t.branch_id
+    where ${where}
+    order by t.txn_date desc, t.created_at desc
+    ${pagination ? sql`limit ${pagination.limit} offset ${pagination.offset}` : sql``}
+  `;
+
+  return { rows, count };
 }

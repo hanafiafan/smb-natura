@@ -1,5 +1,6 @@
 import { FileSpreadsheet } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import type { Account, Branch } from "@/lib/database.types";
 import { aggregate, buildPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { PeriodPicker } from "@/components/period-picker";
@@ -57,31 +58,27 @@ export default async function ReportPage({
   const { periodA, periodB, summary } = computePeriods(mode, sp.start, sp.end);
   const branchId = sp.branch_id ? Number(sp.branch_id) : null;
 
-  const supabase = await createClient();
   const min = periodA.start < periodB.start ? periodA.start : periodB.start;
   const max = periodA.end > periodB.end ? periodA.end : periodB.end;
 
-  const [accountsRes, branchesRes, txnsQuery] = await Promise.all([
-    supabase.from("accounts").select("*").eq("is_active", true).order("sort_order", { ascending: true }),
-    supabase.from("branches").select("*").eq("is_active", true).order("id"),
-    (async () => {
-      let q = supabase.from("transactions").select("account_id, txn_date, amount, branch_id").gte("txn_date", min).lte("txn_date", max);
-      if (branchId) q = q.eq("branch_id", branchId);
-      return await q;
-    })(),
+  const [accounts, branches, txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where is_active = true order by sort_order asc`,
+    sql<Branch[]>`select * from branches where is_active = true order by id`,
+    sql<{ account_id: number; txn_date: string; amount: number; branch_id: number }[]>`
+      select account_id, txn_date, amount, branch_id from transactions
+      where txn_date >= ${min} and txn_date <= ${max}
+      ${branchId ? sql`and branch_id = ${branchId}` : sql``}
+    `,
   ]);
-  if (accountsRes.error) throw accountsRes.error;
-  if (branchesRes.error) throw branchesRes.error;
-  if (txnsQuery.error) throw txnsQuery.error;
 
-  const aggs = aggregate(txnsQuery.data ?? [], periodA, periodB);
-  const pnl = buildPnL(accountsRes.data ?? [], aggs);
+  const aggs = aggregate(txns, periodA, periodB);
+  const pnl = buildPnL(accounts, aggs);
 
   const omsetA = pnl.totals.netRevenue[0];
   const omsetB = pnl.totals.netRevenue[1];
 
   const branchName = branchId
-    ? branchesRes.data?.find((b) => b.id === branchId)?.name ?? "—"
+    ? branches.find((b) => b.id === branchId)?.name ?? "—"
     : "[Semua Cabang]";
 
   const colA = fmtColHeader(periodA);
@@ -116,13 +113,13 @@ export default async function ReportPage({
         <PeriodPicker />
       </div>
 
-      {branchesRes.data && branchesRes.data.length > 1 && (
+      {branches.length > 1 && (
         <form className="no-print flex items-end gap-3 card p-4">
           <div>
             <label className="label" htmlFor="branch_id">Cabang</label>
             <select id="branch_id" name="branch_id" defaultValue={branchId ?? ""} className="select">
               <option value="">Semua Cabang</option>
-              {branchesRes.data.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
           <input type="hidden" name="mode" value={mode} />

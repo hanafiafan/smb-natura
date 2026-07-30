@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Wallet, TrendingUp, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Star, Megaphone } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL } from "@/lib/pnl";
 import { fmtRp, fmtRpFull, variance } from "@/lib/format";
 import { KpiCard } from "@/components/kpi-card";
@@ -23,19 +24,19 @@ export default async function DashboardPage({
   const mode = (sp.mode ?? "monthly") as PeriodMode;
   const { periodA, periodB, labelA, labelB, summary } = computePeriods(mode, sp.start, sp.end);
 
-  const supabase = await createClient();
   const min = periodA.start < periodB.start ? periodA.start : periodB.start;
   const max = periodA.end > periodB.end ? periodA.end : periodB.end;
 
-  const [accountsRes, txnsRes] = await Promise.all([
-    supabase.from("accounts").select("*").eq("is_active", true).order("sort_order", { ascending: true }),
-    supabase.from("transactions").select("account_id, txn_date, amount").gte("txn_date", min).lte("txn_date", max),
+  const [accounts, txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where is_active = true order by sort_order asc`,
+    sql<{ account_id: number; txn_date: string; amount: number }[]>`
+      select account_id, txn_date, amount from transactions
+      where txn_date >= ${min} and txn_date <= ${max}
+    `,
   ]);
-  if (accountsRes.error) throw accountsRes.error;
-  if (txnsRes.error) throw txnsRes.error;
 
-  const aggs = aggregate(txnsRes.data ?? [], periodA, periodB);
-  const pnl = buildPnL(accountsRes.data ?? [], aggs);
+  const aggs = aggregate(txns, periodA, periodB);
+  const pnl = buildPnL(accounts, aggs);
   const { totals } = pnl;
 
   const grossMarginB = totals.netRevenue[1] > 0 ? (totals.grossProfit[1] / totals.netRevenue[1]) * 100 : 0;

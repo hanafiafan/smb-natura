@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getSession, verifyPassword } from "@/lib/session";
 
 const LoginSchema = z.object({
   email: z.email(),
@@ -18,20 +18,25 @@ export async function login(formData: FormData) {
   if (!parsed.success) {
     redirect(`/login?error=${encodeURIComponent("Email atau password tidak valid.")}`);
   }
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) {
-    const msg = encodeURIComponent(error.message);
+
+  const validEmail = parsed.data.email === process.env.ADMIN_EMAIL;
+  if (!validEmail || !verifyPassword(parsed.data.password)) {
+    const msg = encodeURIComponent("Email atau password salah.");
     const email = encodeURIComponent(parsed.data.email);
     redirect(`/login?error=${msg}&email=${email}`);
   }
+
+  const session = await getSession();
+  session.email = parsed.data.email;
+  await session.save();
+
   revalidatePath("/", "layout");
   redirect("/");
 }
 
 export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const session = await getSession();
+  session.destroy();
   revalidatePath("/", "layout");
   redirect("/login");
 }

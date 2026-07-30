@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 
 const TxnSchema = z.object({
   txn_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
@@ -37,10 +37,9 @@ export async function createTransaction(_prev: ActionState, formData: FormData):
   const { fieldErrors, data } = await parseAndPack(formData);
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { error } = await supabase.from("transactions").insert({ ...data, user_id: user?.id ?? null });
-  if (error) return { error: error.message };
+  await sql`
+    insert into transactions ${sql(data, "txn_date", "account_id", "branch_id", "amount", "description", "reference")}
+  `;
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");
@@ -51,9 +50,10 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
   const { fieldErrors, data } = await parseAndPack(formData);
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("transactions").update(data).eq("id", id);
-  if (error) return { error: error.message };
+  await sql`
+    update transactions set ${sql(data, "txn_date", "account_id", "branch_id", "amount", "description", "reference")}
+    where id = ${id}
+  `;
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");
@@ -61,9 +61,7 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
 }
 
 export async function deleteTransaction(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("transactions").delete().eq("id", id);
-  if (error) throw error;
+  await sql`delete from transactions where id = ${id}`;
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");

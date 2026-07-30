@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { CheckCircle2, FileSpreadsheet } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import type { Account, Branch } from "@/lib/database.types";
 import { fmtRpFull, fmtDate } from "@/lib/format";
 import { DeleteBtn } from "@/components/delete-btn";
-import { buildTransactionsQuery } from "@/lib/transactions-query";
+import { queryTransactions } from "@/lib/transactions-query";
 
 export const metadata = { title: "Transaksi — SMB Natura" };
 
@@ -31,24 +32,22 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const end = sp.end ?? lastOfMonth();
   const page = Math.max(1, Number(sp.page ?? "1"));
   const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
 
-  const supabase = await createClient();
-  const [{ data: accounts }, { data: branches }] = await Promise.all([
-    supabase.from("accounts").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("branches").select("*").eq("is_active", true).order("id"),
+  const [accounts, branches] = await Promise.all([
+    sql<Account[]>`select * from accounts where is_active = true order by sort_order`,
+    sql<Branch[]>`select * from branches where is_active = true order by id`,
   ]);
 
-  const query = buildTransactionsQuery(supabase, { ...sp, start, end }, accounts ?? []).range(from, to);
+  const { rows: txns, count: total } = await queryTransactions(
+    { ...sp, start, end },
+    accounts,
+    { limit: PAGE_SIZE, offset: from },
+  );
 
-  const { data: txns, error, count } = await query;
-  if (error) throw error;
-
-  const total = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const sumAmount = (txns ?? []).reduce((s, t) => s + Number(t.amount), 0);
+  const sumAmount = txns.reduce((s, t) => s + Number(t.amount), 0);
 
-  const categories = Array.from(new Set((accounts ?? []).map((a) => a.category).filter(Boolean) as string[])).sort();
+  const categories = Array.from(new Set(accounts.map((a) => a.category).filter(Boolean) as string[])).sort();
 
   return (
     <div className="space-y-6">
@@ -90,11 +89,11 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         };
         if (sp.category) active.push({ label: `Kategori: ${sp.category}`, removeQuery: removeBuilder("category") });
         if (sp.account_id) {
-          const acc = accounts?.find((a) => a.id === Number(sp.account_id));
+          const acc = accounts.find((a) => a.id === Number(sp.account_id));
           active.push({ label: `Akun: ${acc?.name ?? sp.account_id}`, removeQuery: removeBuilder("account_id") });
         }
         if (sp.branch_id) {
-          const br = branches?.find((b) => b.id === Number(sp.branch_id));
+          const br = branches.find((b) => b.id === Number(sp.branch_id));
           active.push({ label: `Cabang: ${br?.name ?? sp.branch_id}`, removeQuery: removeBuilder("branch_id") });
         }
         if (sp.q) active.push({ label: `Cari: "${sp.q}"`, removeQuery: removeBuilder("q") });
@@ -132,15 +131,15 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <label className="label" htmlFor="account_id">Akun</label>
           <select id="account_id" name="account_id" defaultValue={sp.account_id ?? ""} className="select" style={{ minWidth: 220 }}>
             <option value="">Semua Akun</option>
-            {(accounts ?? []).map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
           </select>
         </div>
-        {(branches?.length ?? 0) > 1 && (
+        {branches.length > 1 && (
           <div>
             <label className="label" htmlFor="branch_id">Cabang</label>
             <select id="branch_id" name="branch_id" defaultValue={sp.branch_id ?? ""} className="select">
               <option value="">Semua Cabang</option>
-              {(branches ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
         )}
@@ -155,7 +154,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       </form>
 
       <div className="card overflow-x-auto">
-        {(!txns || txns.length === 0) ? (
+        {txns.length === 0 ? (
           <div className="p-10 text-center" style={{ color: "var(--muted)" }}>Tidak ada transaksi di filter ini.</div>
         ) : (
           <table className="pnl-table">

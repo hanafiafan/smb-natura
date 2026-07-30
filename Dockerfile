@@ -8,11 +8,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Needed at build time: NEXT_PUBLIC_* vars are inlined into the client bundle.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+# No env vars needed at build time — DATABASE_URL/SESSION_SECRET/ADMIN_* are
+# plain server-side vars, only read at request time, not inlined into the build.
 RUN npm run build
 
 FROM node:20-alpine AS runner

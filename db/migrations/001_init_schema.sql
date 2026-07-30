@@ -31,7 +31,6 @@ create table transactions (
   amount          numeric(18, 2) not null check (amount >= 0),
   description     text,
   reference       text,
-  user_id         uuid references auth.users(id) on delete set null,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
@@ -44,14 +43,6 @@ begin new.updated_at = now(); return new; end;
 $$ language plpgsql;
 create trigger transactions_updated_at before update on transactions
   for each row execute function set_updated_at();
-
-alter table accounts enable row level security;
-alter table branches enable row level security;
-alter table transactions enable row level security;
-
-create policy "authenticated read accounts" on accounts for select to authenticated using (true);
-create policy "authenticated read branches" on branches for select to authenticated using (true);
-create policy "authenticated all transactions" on transactions for all to authenticated using (true) with check (true);
 
 insert into branches (id, name) values (1, 'Semua Cabang');
 alter sequence branches_id_seq restart with 2;
