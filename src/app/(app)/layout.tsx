@@ -8,9 +8,11 @@ import { Backdrop } from "@/components/layout/backdrop";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  if (!session.email) redirect("/login");
+  // userId/role didn't exist on sessions created before multi-user login shipped —
+  // treat those as logged out so they re-authenticate under the new session shape.
+  if (!session.email || !session.userId || !session.role) redirect("/login");
 
-  const brands = await getAccessibleBrands(session.userId!, session.role!);
+  const brands = await getAccessibleBrands(session.userId, session.role);
   const activeBrand = brands.find((b) => b.id === session.activeBrandId);
 
   return (

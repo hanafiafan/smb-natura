@@ -7,12 +7,12 @@ import { getSession } from "@/lib/session";
 
 export async function switchBrand(formData: FormData) {
   const session = await getSession();
-  if (!session.email) redirect("/login");
+  if (!session.email || !session.userId || !session.role) redirect("/login");
 
   const brandId = Number(formData.get("brand_id"));
   if (session.role !== "super_admin") {
     const [allowed] = await sql`
-      select 1 from user_brands where user_id = ${session.userId!} and brand_id = ${brandId}
+      select 1 from user_brands where user_id = ${session.userId} and brand_id = ${brandId}
     `;
     if (!allowed) return;
   }
