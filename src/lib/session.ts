@@ -1,8 +1,15 @@
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
-import { scryptSync, timingSafeEqual } from "crypto";
+import { redirect } from "next/navigation";
+import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import type { UserRole } from "@/lib/database.types";
 
-export type SessionData = { email?: string };
+export type SessionData = {
+  userId?: string;
+  email?: string;
+  role?: UserRole;
+  activeBrandId?: number;
+};
 
 export const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET!,
@@ -19,10 +26,23 @@ export async function getSession(): Promise<IronSession<SessionData>> {
   return getIronSession<SessionData>(await cookies(), sessionOptions);
 }
 
-/** ADMIN_PASSWORD_HASH format: "<saltHex>:<hashHex>", generated via scryptSync. */
-export function verifyPassword(password: string): boolean {
-  const stored = process.env.ADMIN_PASSWORD_HASH;
-  const [saltHex, hashHex] = stored?.split(":") ?? [];
+/** Redirects to /login if not authenticated, or to /master-data-only notice if not super admin. */
+export async function requireSuperAdmin(): Promise<IronSession<SessionData>> {
+  const session = await getSession();
+  if (!session.email) redirect("/login");
+  if (session.role !== "super_admin") redirect("/");
+  return session;
+}
+
+/** password_hash format: "<saltHex>:<hashHex>", generated via scryptSync. */
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, 64);
+  return `${salt.toString("hex")}:${hash.toString("hex")}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  const [saltHex, hashHex] = storedHash.split(":");
   if (!saltHex || !hashHex) return false;
 
   const expected = Buffer.from(hashHex, "hex");

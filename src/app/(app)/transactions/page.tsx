@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { sql } from "@/lib/db";
-import type { Account, Branch } from "@/lib/database.types";
+import { getSession } from "@/lib/session";
+import type { Account } from "@/lib/database.types";
 import { fmtRpFull, fmtDate } from "@/lib/format";
 import { DeleteBtn } from "@/components/delete-btn";
 import { queryTransactions } from "@/lib/transactions-query";
@@ -22,7 +23,7 @@ function lastOfMonth() {
 
 type SP = {
   start?: string; end?: string;
-  account_id?: string; category?: string; branch_id?: string;
+  account_id?: string; category?: string;
   q?: string; page?: string; ok?: string;
 };
 
@@ -33,12 +34,13 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const page = Math.max(1, Number(sp.page ?? "1"));
   const from = (page - 1) * PAGE_SIZE;
 
-  const [accounts, branches] = await Promise.all([
-    sql<Account[]>`select * from accounts where is_active = true order by sort_order`,
-    sql<Branch[]>`select * from branches where is_active = true order by id`,
-  ]);
+  const session = await getSession();
+  const brandId = session.activeBrandId!;
+
+  const accounts = await sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order`;
 
   const { rows: txns, count: total } = await queryTransactions(
+    brandId,
     { ...sp, start, end },
     accounts,
     { limit: PAGE_SIZE, offset: from },
@@ -92,10 +94,6 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           const acc = accounts.find((a) => a.id === Number(sp.account_id));
           active.push({ label: `Akun: ${acc?.name ?? sp.account_id}`, removeQuery: removeBuilder("account_id") });
         }
-        if (sp.branch_id) {
-          const br = branches.find((b) => b.id === Number(sp.branch_id));
-          active.push({ label: `Cabang: ${br?.name ?? sp.branch_id}`, removeQuery: removeBuilder("branch_id") });
-        }
         if (sp.q) active.push({ label: `Cari: "${sp.q}"`, removeQuery: removeBuilder("q") });
         if (active.length === 0) return null;
         return (
@@ -134,15 +132,6 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
           </select>
         </div>
-        {branches.length > 1 && (
-          <div>
-            <label className="label" htmlFor="branch_id">Cabang</label>
-            <select id="branch_id" name="branch_id" defaultValue={sp.branch_id ?? ""} className="select">
-              <option value="">Semua Cabang</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-        )}
         <div className="flex-1 min-w-[180px]">
           <label className="label" htmlFor="q">Cari</label>
           <input type="text" id="q" name="q" defaultValue={sp.q ?? ""} className="input" placeholder="keterangan / referensi" />
@@ -160,7 +149,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <table className="pnl-table">
             <thead>
               <tr>
-                <th>Tanggal</th><th>Akun</th><th>Kategori</th><th>Cabang</th><th>Keterangan</th><th>Referensi</th><th>Jumlah</th><th></th>
+                <th>Tanggal</th><th>Akun</th><th>Kategori</th><th>Keterangan</th><th>Referensi</th><th>Jumlah</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -172,7 +161,6 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
                     <div className="text-[11px]" style={{ color: "var(--muted)" }}>{t.accounts?.code}</div>
                   </td>
                   <td>{t.accounts?.category ?? <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                  <td>{t.branches?.name ?? "—"}</td>
                   <td style={{ maxWidth: 240, whiteSpace: "normal" }}>{t.description ?? <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td>{t.reference ?? <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td className="font-mono">{fmtRpFull(Number(t.amount))}</td>

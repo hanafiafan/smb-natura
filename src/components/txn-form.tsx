@@ -2,8 +2,8 @@
 
 import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDownCircle, ArrowUpCircle, Check, Calendar, MapPin, Wallet, FileText, Hash, Save, CircleHelp } from "lucide-react";
-import type { Account, Branch, Transaction } from "@/lib/database.types";
+import { ArrowDownCircle, ArrowUpCircle, Check, Calendar, Wallet, FileText, Hash, Save, CircleHelp } from "lucide-react";
+import type { Account, Transaction } from "@/lib/database.types";
 import type { ActionState } from "@/app/(app)/transactions/actions";
 import { cn } from "@/lib/utils";
 
@@ -53,13 +53,11 @@ const IDR_FORMAT = new Intl.NumberFormat("id-ID");
 export function TxnForm({
   action,
   accounts,
-  branches,
   txn,
   submitLabel = "Simpan Transaksi",
 }: {
   action: (state: ActionState, fd: FormData) => Promise<ActionState>;
   accounts: Account[];
-  branches: Branch[];
   txn?: Transaction | null;
   submitLabel?: string;
 }) {
@@ -75,7 +73,6 @@ export function TxnForm({
   const [accountId, setAccountId] = useState<number | "">(txn?.account_id ?? "");
   const [amountRaw, setAmountRaw] = useState<string>(txn?.amount ? String(txn.amount) : "");
   const [txnDate, setTxnDate] = useState<string>(txn?.txn_date ?? new Date().toISOString().slice(0, 10));
-  const [branchId, setBranchId] = useState<number>(txn?.branch_id ?? branches[0]?.id ?? 1);
 
   const groups = flow === "in" ? IN_GROUPS : OUT_GROUPS;
 
@@ -94,7 +91,6 @@ export function TxnForm({
   const selectedAccount = accounts.find((a) => a.id === accountId) || null;
   const amountNum = Number(amountRaw.replace(/\D/g, "")) || 0;
   const amountFormatted = amountNum > 0 ? `Rp ${IDR_FORMAT.format(amountNum)}` : "Rp 0";
-  const branchName = branches.find((b) => b.id === branchId)?.name ?? "—";
   const txnDateFmt = txnDate ? new Date(txnDate).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—";
 
   const canSubmit = !!accountId && amountNum > 0 && !!txnDate;
@@ -229,41 +225,22 @@ export function TxnForm({
             <FieldError err={state?.fieldErrors?.amount} />
           </div>
 
-          {/* Date + Branch */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label !flex items-center gap-1.5" htmlFor="txn_date">
-                <Calendar size={13} /> Tanggal <span style={{ color: "var(--neg)" }}>*</span>
-              </label>
-              <input
-                type="date"
-                id="txn_date"
-                name="txn_date"
-                required
-                className="input"
-                value={txnDate}
-                onChange={(e) => setTxnDate(e.target.value)}
-              />
-              <p className="text-[11px] mt-1 text-gray-500">Kapan transaksi terjadi (default: hari ini).</p>
-              <FieldError err={state?.fieldErrors?.txn_date} />
-            </div>
-            <div>
-              <label className="label !flex items-center gap-1.5" htmlFor="branch_id">
-                <MapPin size={13} /> Cabang <span style={{ color: "var(--neg)" }}>*</span>
-              </label>
-              <select
-                id="branch_id"
-                name="branch_id"
-                required
-                className="select"
-                value={branchId}
-                onChange={(e) => setBranchId(Number(e.target.value))}
-              >
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-              <p className="text-[11px] mt-1 text-gray-500">Cabang mana yang mencatat transaksi ini.</p>
-              <FieldError err={state?.fieldErrors?.branch_id} />
-            </div>
+          {/* Date */}
+          <div>
+            <label className="label !flex items-center gap-1.5" htmlFor="txn_date">
+              <Calendar size={13} /> Tanggal <span style={{ color: "var(--neg)" }}>*</span>
+            </label>
+            <input
+              type="date"
+              id="txn_date"
+              name="txn_date"
+              required
+              className="input"
+              value={txnDate}
+              onChange={(e) => setTxnDate(e.target.value)}
+            />
+            <p className="text-[11px] mt-1 text-gray-500">Kapan transaksi terjadi (default: hari ini).</p>
+            <FieldError err={state?.fieldErrors?.txn_date} />
           </div>
 
           {/* Description */}
@@ -329,7 +306,6 @@ export function TxnForm({
           <PreviewRow label="Akun" value={selectedAccount?.name ?? null} colSpan />
           <PreviewRow label="Jumlah" value={amountNum > 0 ? amountFormatted : null} big />
           <PreviewRow label="Tanggal" value={txnDate ? txnDateFmt : null} />
-          <PreviewRow label="Cabang" value={branchName} filled />
         </div>
       </div>
 

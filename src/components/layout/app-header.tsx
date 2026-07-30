@@ -2,8 +2,18 @@
 import { Menu, X, LogOut } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { logout } from "@/app/login/actions";
+import { switchBrand } from "@/app/(app)/brand-actions";
+import type { AccessibleBrand } from "@/lib/brands";
 
-export function AppHeader({ email }: { email: string | null }) {
+export function AppHeader({
+  email,
+  brands,
+  activeBrandId,
+}: {
+  email: string | null;
+  brands: AccessibleBrand[];
+  activeBrandId?: number;
+}) {
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
   const handleToggle = () => {
@@ -31,12 +41,26 @@ export function AppHeader({ email }: { email: string | null }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden md:block text-right">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Hari ini</div>
-          <div className="text-sm font-semibold text-gray-800">
-            {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        {brands.length > 1 ? (
+          <form action={switchBrand}>
+            <select
+              name="brand_id"
+              defaultValue={activeBrandId}
+              onChange={(e) => e.currentTarget.form?.requestSubmit()}
+              className="select h-10 text-xs font-semibold"
+              aria-label="Pilih brand aktif"
+            >
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>{b.company_name} — {b.name}</option>
+              ))}
+            </select>
+          </form>
+        ) : brands.length === 1 ? (
+          <div className="hidden md:block text-right">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Brand</div>
+            <div className="text-sm font-semibold text-gray-800">{brands[0].company_name} — {brands[0].name}</div>
           </div>
-        </div>
+        ) : null}
         <div className="w-9 h-9 rounded-full grid place-items-center text-white font-bold text-sm shrink-0 shadow-brand-sm"
           style={{ background: "linear-gradient(135deg, var(--color-brand-500), var(--color-brand-700))" }}>
           {initial}

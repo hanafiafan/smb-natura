@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { sql } from "@/lib/db";
+import { getSession } from "@/lib/session";
 
 const TxnSchema = z.object({
   txn_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
   account_id: z.coerce.number().int().positive("Pilih akun"),
-  branch_id: z.coerce.number().int().positive("Pilih cabang"),
   amount: z.coerce.number().finite().nonnegative("Jumlah harus >= 0"),
   description: z.string().max(500).optional().transform((v) => v?.trim() || null),
   reference: z.string().max(100).optional().transform((v) => v?.trim() || null),
@@ -22,7 +22,6 @@ async function parseAndPack(formData: FormData) {
   const parsed = TxnSchema.safeParse({
     txn_date: formData.get("txn_date"),
     account_id: formData.get("account_id"),
-    branch_id: formData.get("branch_id"),
     amount: rawAmount,
     description: formData.get("description") ?? "",
     reference: formData.get("reference") ?? "",
@@ -37,8 +36,9 @@ export async function createTransaction(_prev: ActionState, formData: FormData):
   const { fieldErrors, data } = await parseAndPack(formData);
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
+  const session = await getSession();
   await sql`
-    insert into transactions ${sql(data, "txn_date", "account_id", "branch_id", "amount", "description", "reference")}
+    insert into transactions ${sql({ ...data, brand_id: session.activeBrandId! }, "brand_id", "txn_date", "account_id", "amount", "description", "reference")}
   `;
 
   revalidatePath("/transactions");
@@ -50,9 +50,10 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
   const { fieldErrors, data } = await parseAndPack(formData);
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
+  const session = await getSession();
   await sql`
-    update transactions set ${sql(data, "txn_date", "account_id", "branch_id", "amount", "description", "reference")}
-    where id = ${id}
+    update transactions set ${sql(data, "txn_date", "account_id", "amount", "description", "reference")}
+    where id = ${id} and brand_id = ${session.activeBrandId!}
   `;
 
   revalidatePath("/transactions");
@@ -61,7 +62,8 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
 }
 
 export async function deleteTransaction(id: string) {
-  await sql`delete from transactions where id = ${id}`;
+  const session = await getSession();
+  await sql`delete from transactions where id = ${id} and brand_id = ${session.activeBrandId!}`;
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");

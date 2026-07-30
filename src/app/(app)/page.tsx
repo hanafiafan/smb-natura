@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Wallet, TrendingUp, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Star, Megaphone } from "lucide-react";
 import { sql } from "@/lib/db";
+import { getSession } from "@/lib/session";
 import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL } from "@/lib/pnl";
 import { fmtRp, fmtRpFull, variance } from "@/lib/format";
@@ -27,11 +28,14 @@ export default async function DashboardPage({
   const min = periodA.start < periodB.start ? periodA.start : periodB.start;
   const max = periodA.end > periodB.end ? periodA.end : periodB.end;
 
+  const session = await getSession();
+  const brandId = session.activeBrandId!;
+
   const [accounts, txns] = await Promise.all([
-    sql<Account[]>`select * from accounts where is_active = true order by sort_order asc`,
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
     sql<{ account_id: number; txn_date: string; amount: number }[]>`
       select account_id, txn_date, amount from transactions
-      where txn_date >= ${min} and txn_date <= ${max}
+      where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
     `,
   ]);
 

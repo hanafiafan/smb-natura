@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ReceiptText, FileBarChart, Sparkles, MoreHorizontal, Leaf } from "lucide-react";
+import { LayoutDashboard, ReceiptText, FileBarChart, Sparkles, MoreHorizontal, Leaf, Building2 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,19 @@ const NAV_QUICK: NavItem[] = [
   { name: "Catat Baru", path: "/transactions/new", icon: <Sparkles size={20} /> },
 ];
 
-export function AppSidebar() {
+const NAV_ADMIN: NavItem[] = [
+  { name: "Master Data", path: "/master-data", icon: <Building2 size={20} /> },
+];
+
+export function AppSidebar({
+  companyName,
+  brandName,
+  isSuperAdmin,
+}: {
+  companyName?: string;
+  brandName?: string;
+  isSuperAdmin?: boolean;
+}) {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
 
@@ -77,8 +89,8 @@ export function AppSidebar() {
         </div>
         {expanded && (
           <div className="min-w-0">
-            <div className="font-bold text-[15px] leading-tight text-gray-900">SMB Natura</div>
-            <div className="text-[11px] text-gray-500 truncate">CV Loka Bumi Persada</div>
+            <div className="font-bold text-[15px] leading-tight text-gray-900">{brandName ?? "SMB Natura"}</div>
+            <div className="text-[11px] text-gray-500 truncate">{companyName ?? "CV Loka Bumi Persada"}</div>
           </div>
         )}
       </Link>
@@ -86,6 +98,7 @@ export function AppSidebar() {
       <nav className="flex flex-col gap-6 overflow-y-auto no-scrollbar flex-1">
         {renderGroup("Menu", NAV_MAIN)}
         {renderGroup("Cepat", NAV_QUICK)}
+        {isSuperAdmin && renderGroup("Admin", NAV_ADMIN)}
       </nav>
 
       {expanded && (

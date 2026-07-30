@@ -1,6 +1,7 @@
 import { FileSpreadsheet } from "lucide-react";
 import { sql } from "@/lib/db";
-import type { Account, Branch } from "@/lib/database.types";
+import { getSession } from "@/lib/session";
+import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { PeriodPicker } from "@/components/period-picker";
@@ -51,23 +52,26 @@ function fmtColHeader(p: { start: string; end: string }): string {
 export default async function ReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; start?: string; end?: string; branch_id?: string }>;
+  searchParams: Promise<{ mode?: string; start?: string; end?: string }>;
 }) {
   const sp = await searchParams;
   const mode = (sp.mode ?? "monthly") as PeriodMode;
   const { periodA, periodB, summary } = computePeriods(mode, sp.start, sp.end);
-  const branchId = sp.branch_id ? Number(sp.branch_id) : null;
 
   const min = periodA.start < periodB.start ? periodA.start : periodB.start;
   const max = periodA.end > periodB.end ? periodA.end : periodB.end;
 
-  const [accounts, branches, txns] = await Promise.all([
-    sql<Account[]>`select * from accounts where is_active = true order by sort_order asc`,
-    sql<Branch[]>`select * from branches where is_active = true order by id`,
-    sql<{ account_id: number; txn_date: string; amount: number; branch_id: number }[]>`
-      select account_id, txn_date, amount, branch_id from transactions
-      where txn_date >= ${min} and txn_date <= ${max}
-      ${branchId ? sql`and branch_id = ${branchId}` : sql``}
+  const session = await getSession();
+  const brandId = session.activeBrandId!;
+
+  const [accounts, [brand], txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
+    sql<{ name: string; company_name: string }[]>`
+      select b.name, c.name as company_name from brands b join companies c on c.id = b.company_id where b.id = ${brandId}
+    `,
+    sql<{ account_id: number; txn_date: string; amount: number }[]>`
+      select account_id, txn_date, amount from transactions
+      where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
     `,
   ]);
 
@@ -76,10 +80,6 @@ export default async function ReportPage({
 
   const omsetA = pnl.totals.netRevenue[0];
   const omsetB = pnl.totals.netRevenue[1];
-
-  const branchName = branchId
-    ? branches.find((b) => b.id === branchId)?.name ?? "—"
-    : "[Semua Cabang]";
 
   const colA = fmtColHeader(periodA);
   const colB = fmtColHeader(periodB);
@@ -93,13 +93,12 @@ export default async function ReportPage({
           <div>
             <h1 className="text-xl font-bold">Laporan Laba/Rugi</h1>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-              CV Loka Bumi Persada · {summary}
-              {branchId && <> · Cabang: {branchName}</>}
+              {brand?.company_name} — {brand?.name} · {summary}
             </p>
           </div>
           <div className="flex gap-2">
             <a
-              href={`/report/export?mode=${mode}&start=${sp.start ?? periodB.start}&end=${sp.end ?? periodB.end}${branchId ? `&branch_id=${branchId}` : ""}`}
+              href={`/report/export?mode=${mode}&start=${sp.start ?? periodB.start}&end=${sp.end ?? periodB.end}`}
               className="btn-outline"
             >
               <FileSpreadsheet size={16} /> Export Excel
@@ -113,35 +112,15 @@ export default async function ReportPage({
         <PeriodPicker />
       </div>
 
-      {branches.length > 1 && (
-        <form className="no-print flex items-end gap-3 card p-4">
-          <div>
-            <label className="label" htmlFor="branch_id">Cabang</label>
-            <select id="branch_id" name="branch_id" defaultValue={branchId ?? ""} className="select">
-              <option value="">Semua Cabang</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-          <input type="hidden" name="mode" value={mode} />
-          {mode === "custom" && (
-            <>
-              <input type="hidden" name="start" value={sp.start ?? periodB.start} />
-              <input type="hidden" name="end" value={sp.end ?? periodB.end} />
-            </>
-          )}
-          <button type="submit" className="btn">Terapkan</button>
-        </form>
-      )}
-
       {/* Report content — screen + print */}
       <div className="report-sheet card p-8 print:p-0 print:border-0 print:shadow-none">
         {/* Header block matching PDF */}
         <div className="report-header mb-5 pb-4" style={{ borderBottom: "2px solid var(--color-gray-800)" }}>
-          <div className="text-[15px] font-bold text-gray-900">CV Loka Bumi Persada</div>
-          <div className="text-[14px] text-gray-800 mt-0.5">Laporan Laba / Rugi</div>
+          <div className="text-[15px] font-bold text-gray-900">{brand?.company_name}</div>
+          <div className="text-[14px] text-gray-800 mt-0.5">Laporan Laba / Rugi — {brand?.name}</div>
           <div className="text-[12px] text-gray-700 mt-1">Tanggal {rangeText}</div>
           <div className="text-[12px] text-gray-700 mt-0.5">
-            Cabang : {branchName}, Mata Uang : Indonesian Rupiah
+            Mata Uang : Indonesian Rupiah
           </div>
         </div>
 

@@ -22,21 +22,21 @@ function toRow(r: PnLRow, omsetA: number, omsetB: number): (string | number)[] {
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session.email) return new Response("Unauthorized", { status: 401 });
+  const brandId = session.activeBrandId;
+  if (!brandId) return new Response("No active brand", { status: 400 });
 
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const mode = (sp.mode ?? "monthly") as PeriodMode;
   const { periodA, periodB } = computePeriods(mode, sp.start, sp.end);
-  const branchId = sp.branch_id ? Number(sp.branch_id) : null;
 
   const min = periodA.start < periodB.start ? periodA.start : periodB.start;
   const max = periodA.end > periodB.end ? periodA.end : periodB.end;
 
   const [accounts, txns] = await Promise.all([
-    sql<Account[]>`select * from accounts where is_active = true order by sort_order asc`,
-    sql<{ account_id: number; txn_date: string; amount: number; branch_id: number }[]>`
-      select account_id, txn_date, amount, branch_id from transactions
-      where txn_date >= ${min} and txn_date <= ${max}
-      ${branchId ? sql`and branch_id = ${branchId}` : sql``}
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
+    sql<{ account_id: number; txn_date: string; amount: number }[]>`
+      select account_id, txn_date, amount from transactions
+      where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
     `,
   ]);
 
