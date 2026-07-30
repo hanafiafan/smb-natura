@@ -1,11 +1,13 @@
 import { FileSpreadsheet } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { PeriodPicker } from "@/components/period-picker";
 import { PrintButton } from "@/components/print-button";
+import { BrandFilterCard } from "@/components/brand-filter";
 import { computePeriods, type PeriodMode } from "@/lib/period";
 
 export const metadata = { title: "Laporan Laba/Rugi — SMB Natura" };
@@ -64,16 +66,15 @@ export default async function ReportPage({
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const [accounts, [brand], txns] = await Promise.all([
+  const [accounts, brands, txns] = await Promise.all([
     sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
-    sql<{ name: string; company_name: string }[]>`
-      select b.name, c.name as company_name from brands b join companies c on c.id = b.company_id where b.id = ${brandId}
-    `,
+    getAccessibleBrands(session.userId!, session.role!),
     sql<{ account_id: number; txn_date: string; amount: number }[]>`
       select account_id, txn_date, amount from transactions
       where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
     `,
   ]);
+  const brand = brands.find((b) => b.id === brandId);
 
   const aggs = aggregate(txns, periodA, periodB);
   const pnl = buildPnL(accounts, aggs);
@@ -108,6 +109,9 @@ export default async function ReportPage({
         </div>
       </div>
 
+      <div className="no-print">
+        <BrandFilterCard brands={brands} activeBrandId={brandId} />
+      </div>
       <div className="no-print">
         <PeriodPicker />
       </div>

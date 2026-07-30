@@ -20,5 +20,8 @@ export async function switchBrand(formData: FormData) {
   session.activeBrandId = brandId;
   await session.save();
   revalidatePath("/", "layout");
-  redirect("/");
+
+  const redirectTo = String(formData.get("redirect_to") ?? "/");
+  // Only allow same-origin relative paths — never let this become an open redirect.
+  redirect(redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/");
 }

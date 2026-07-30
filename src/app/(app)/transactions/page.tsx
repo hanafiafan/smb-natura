@@ -2,10 +2,12 @@ import Link from "next/link";
 import { CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { fmtRpFull, fmtDate } from "@/lib/format";
 import { DeleteBtn } from "@/components/delete-btn";
 import { queryTransactions } from "@/lib/transactions-query";
+import { BrandFilterCard } from "@/components/brand-filter";
 
 export const metadata = { title: "Transaksi — SMB Natura" };
 
@@ -37,7 +39,10 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const accounts = await sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order`;
+  const [accounts, brands] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order`,
+    getAccessibleBrands(session.userId!, session.role!),
+  ]);
 
   const { rows: txns, count: total } = await queryTransactions(
     brandId,
@@ -67,6 +72,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <Link href="/transactions/new" className="btn">+ Catat Transaksi Baru</Link>
         </div>
       </div>
+
+      <BrandFilterCard brands={brands} activeBrandId={brandId} />
 
       {sp.ok && (
         <div className="rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2"

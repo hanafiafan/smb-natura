@@ -2,11 +2,13 @@ import Link from "next/link";
 import { Wallet, TrendingUp, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Star, Megaphone } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL } from "@/lib/pnl";
 import { fmtRp, fmtRpFull, variance } from "@/lib/format";
 import { KpiCard } from "@/components/kpi-card";
 import { PeriodPicker } from "@/components/period-picker";
+import { BrandFilterCard } from "@/components/brand-filter";
 import { CategoryDonut, ComparisonBar } from "@/components/charts";
 import { RevenueFlow } from "@/components/revenue-flow";
 import { RevenueBreakdown } from "@/components/revenue-breakdown";
@@ -31,13 +33,15 @@ export default async function DashboardPage({
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const [accounts, txns] = await Promise.all([
+  const [accounts, txns, brands] = await Promise.all([
     sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
     sql<{ account_id: number; txn_date: string; amount: number }[]>`
       select account_id, txn_date, amount from transactions
       where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
     `,
+    getAccessibleBrands(session.userId!, session.role!),
   ]);
+  const activeBrand = brands.find((b) => b.id === brandId);
 
   const aggs = aggregate(txns, periodA, periodB);
   const pnl = buildPnL(accounts, aggs);
@@ -84,12 +88,13 @@ export default async function DashboardPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-            CV Loka Bumi Persada · {summary}
+            {activeBrand?.company_name} — {activeBrand?.name} · {summary}
           </p>
         </div>
         <Link href="/transactions/new" className="btn"><Sparkles size={16} /> Catat Transaksi</Link>
       </div>
 
+      <BrandFilterCard brands={brands} activeBrandId={brandId} />
       <PeriodPicker />
 
       {!hasData ? (
