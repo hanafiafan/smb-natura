@@ -2,9 +2,11 @@ import Link from "next/link";
 import { CheckCircle2, FileSpreadsheet, Wallet, ArrowDownCircle, ArrowUpCircle, Landmark } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
 import type { CashFlowEntry } from "@/lib/database.types";
 import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth } from "@/lib/format";
 import { DeleteCashFlowBtn } from "@/components/delete-cashflow-btn";
+import { BrandFilterCard } from "@/components/brand-filter";
 
 export const metadata = { title: "Arus Kas — SMB Natura" };
 
@@ -27,7 +29,7 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
   if (q) conditions.push(sql`cfe.description ilike ${"%" + q + "%"}`);
   const where = conditions.reduce((acc, c) => sql`${acc} and ${c}`);
 
-  const [[{ balance }], [{ count }], entries] = await Promise.all([
+  const [[{ balance }], [{ count }], entries, brands] = await Promise.all([
     sql<{ balance: number }[]>`
       select coalesce(sum(case when type = 'in' then amount else -amount end), 0) as balance
       from cash_flow_entries where brand_id = ${brandId}
@@ -40,6 +42,7 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
       order by cfe.entry_date desc, cfe.created_at desc
       limit ${PAGE_SIZE} offset ${from}
     `,
+    getAccessibleBrands(session.userId!, session.role!),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
@@ -63,6 +66,8 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
           <Link href="/cash-flow/new" className="btn">+ Catat Arus Kas</Link>
         </div>
       </div>
+
+      <BrandFilterCard brands={brands} activeBrandId={brandId} />
 
       <div className="card p-5" style={{ background: "linear-gradient(135deg, var(--color-brand-50) 0%, #ffffff 60%)" }}>
         <div className="flex items-center gap-3">

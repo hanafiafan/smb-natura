@@ -2,9 +2,11 @@ import Link from "next/link";
 import { CheckCircle2, XCircle, Package } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
 import type { Product } from "@/lib/database.types";
 import { fmtRpFull } from "@/lib/format";
 import { toggleProductActive } from "./actions";
+import { BrandFilterCard } from "@/components/brand-filter";
 
 export const metadata = { title: "Produk — SMB Natura" };
 
@@ -14,12 +16,15 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const products = q
-    ? await sql<Product[]>`
-        select * from products where brand_id = ${brandId} and (name ilike ${"%" + q + "%"} or sku ilike ${"%" + q + "%"})
-        order by name
-      `
-    : await sql<Product[]>`select * from products where brand_id = ${brandId} order by name`;
+  const [products, brands] = await Promise.all([
+    q
+      ? sql<Product[]>`
+          select * from products where brand_id = ${brandId} and (name ilike ${"%" + q + "%"} or sku ilike ${"%" + q + "%"})
+          order by name
+        `
+      : sql<Product[]>`select * from products where brand_id = ${brandId} order by name`,
+    getAccessibleBrands(session.userId!, session.role!),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -32,6 +37,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </div>
         <Link href="/products/new" className="btn">+ Tambah Produk</Link>
       </div>
+
+      <BrandFilterCard brands={brands} activeBrandId={brandId} />
 
       <form className="card p-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">

@@ -2,10 +2,12 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { buildPnL, type PnLRow } from "@/lib/pnl";
 import { fmtRpFull, firstOfMonth, lastOfMonth } from "@/lib/format";
 import { saveBudgetTargets } from "./actions";
+import { BrandFilterCard } from "@/components/brand-filter";
 
 export const metadata = { title: "Anggaran — SMB Natura" };
 
@@ -26,7 +28,7 @@ export default async function AnggaranPage({
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const [accounts, targets, txns] = await Promise.all([
+  const [accounts, targets, txns, brands] = await Promise.all([
     sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
     sql<{ account_id: number; target_amount: number }[]>`
       select account_id, target_amount from budget_targets
@@ -36,6 +38,7 @@ export default async function AnggaranPage({
       select account_id, amount from transactions
       where brand_id = ${brandId} and txn_date >= ${start} and txn_date <= ${end}
     `,
+    getAccessibleBrands(session.userId!, session.role!),
   ]);
 
   const targetMap = new Map(targets.map((t) => [t.account_id, Number(t.target_amount)]));
@@ -53,6 +56,8 @@ export default async function AnggaranPage({
           <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Target vs Realisasi per akun untuk satu periode.</p>
         </div>
       </div>
+
+      <BrandFilterCard brands={brands} activeBrandId={brandId} />
 
       {sp.ok && (
         <div className="rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2"
