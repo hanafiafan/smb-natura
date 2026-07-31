@@ -7,9 +7,10 @@ Dashboard operasional multi-perusahaan/multi-brand. Tiap brand punya Chart of Ac
 ## Fitur
 
 - **Login multi-user** — Super Admin (akses semua perusahaan & brand) atau Admin Brand (akses brand yang ditautkan saja)
-- **Master Data** — tambah Perusahaan (CV/PT), tambah Brand di dalamnya, tambah pengguna + assign brand (khusus Super Admin)
+- **Master Data** — tambah/edit Perusahaan (CV/PT), tambah/edit Brand di dalamnya, tambah/edit pengguna + assign brand (khusus Super Admin)
 - **Dashboard** — 4 KPI (Omset, Laba Kotor, Laba Op, Laba Bersih) + donut komposisi beban + top 10 + MoM per kategori · filter periode compare
 - **Transaksi** — form input + list dengan filter tanggal/akun/kategori/cari · CRUD lengkap · Export Excel
+- **Arus Kas** — buku kas per brand (Kas Masuk/Keluar, channel & akun opsional) dengan saldo "Kas Saat Ini" berjalan · CRUD lengkap · Export Excel
 - **Laporan L/R** — tabel P&L format PDF (Deskripsi · Periode A · %A · Periode B · %B · %Var), judul & nama perusahaan mengikuti brand aktif · Print → PDF · Export Excel
 
 Brand baru otomatis dibuatkan Chart of Accounts starter (copy dari template Natura, ~50 akun: Pendapatan, HPP, Gaji, Kantor, Pemasaran, Fee E-Commerce, Penyusutan, Produksi, Ops Lainnya, Sewa, Non-Op, Pajak) — bisa diubah bebas sesudahnya per brand.
@@ -30,6 +31,7 @@ Butuh Postgres (self-host, VPS mana pun, atau Docker lokal). Jalankan migrasi vi
 psql "$DATABASE_URL" -f db/migrations/001_init_schema.sql
 psql "$DATABASE_URL" -f db/migrations/002_seed_chart_of_accounts.sql
 psql "$DATABASE_URL" -f db/migrations/003_multi_tenant.sql
+psql "$DATABASE_URL" -f db/migrations/004_cash_flow.sql
 ```
 
 Migrasi 003 otomatis membuat 1 perusahaan default ("CV Loka Bumi Persada") + 1 brand default ("Natura") dan memindahkan Chart of Accounts yang sudah ada ke brand itu — data lama tidak hilang.
@@ -90,12 +92,18 @@ src/
 │       │   ├── export/route.ts # export CSV
 │       │   ├── new/page.tsx
 │       │   └── [id]/edit/page.tsx
+│       ├── cash-flow/
+│       │   ├── page.tsx        # list + saldo "Kas Saat Ini" + filter + pagination
+│       │   ├── actions.ts      # server actions (CRUD)
+│       │   ├── export/route.ts # export CSV
+│       │   ├── new/page.tsx
+│       │   └── [id]/edit/page.tsx
 │       └── report/
 │           ├── page.tsx        # Laporan L/R format PDF (judul dinamis per brand)
 │           └── export/route.ts # export CSV
-├── components/                  # Nav, PeriodPicker, KpiCard, charts, TxnForm
+├── components/                  # Nav, PeriodPicker, KpiCard, charts, TxnForm, CashFlowForm
 ├── lib/
-│   ├── database.types.ts       # Company/Brand/AppUser/Account/Transaction types
+│   ├── database.types.ts       # Company/Brand/AppUser/Account/Transaction/CashFlowEntry types
 │   ├── db.ts                   # Postgres client (postgres.js)
 │   ├── session.ts              # iron-session + role/brand helpers + password hash
 │   ├── brands.ts                # getAccessibleBrands (super admin vs brand admin)
@@ -107,6 +115,6 @@ src/
 
 ## Yang di-skip (add later kalau perlu)
 
-- Upload PDF parser · Bulk import CSV/Excel · Neraca & Cash Flow · Budget vs Actual · Edit/rename perusahaan & brand (baru ada tambah + aktif/nonaktifkan)
+- Upload PDF parser · Bulk import CSV/Excel · Neraca (Balance Sheet) · Budget vs Actual
 
 Dashboard versi awal 1-file (`../index.html`) di-archive sebagai referensi statis.

@@ -58,3 +58,18 @@ export type Transaction = {
 export type TransactionWithRelations = Transaction & {
   accounts: Pick<Account, "code" | "name" | "section" | "category"> | null;
 };
+
+export type CashFlowType = "in" | "out";
+
+export type CashFlowEntry = {
+  id: string;
+  brand_id: number;
+  entry_date: string;
+  description: string;
+  channel: string | null;
+  account_note: string | null;
+  type: CashFlowType;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+};
