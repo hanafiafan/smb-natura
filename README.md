@@ -12,6 +12,7 @@ Dashboard operasional multi-perusahaan/multi-brand. Tiap brand punya Chart of Ac
 - **Transaksi** — form input + list dengan filter tanggal/akun/kategori/cari · CRUD lengkap · Export Excel
 - **Arus Kas** — buku kas per brand (Kas Masuk/Keluar, channel & akun opsional) dengan saldo "Kas Saat Ini" berjalan · CRUD lengkap · Export Excel
 - **Laporan L/R** — tabel P&L format PDF (Deskripsi · Periode A · %A · Periode B · %B · %Var), judul & nama perusahaan mengikuti brand aktif · Print → PDF · Export Excel
+- **Panduan Penggunaan** — dokumentasi in-app cara pakai tiap menu, bagian Master Data hanya tampil untuk Super Admin
 
 Brand baru otomatis dibuatkan Chart of Accounts starter (copy dari template Natura, ~50 akun: Pendapatan, HPP, Gaji, Kantor, Pemasaran, Fee E-Commerce, Penyusutan, Produksi, Ops Lainnya, Sewa, Non-Op, Pajak) — bisa diubah bebas sesudahnya per brand.
 
@@ -98,9 +99,11 @@ src/
 │       │   ├── export/route.ts # export CSV
 │       │   ├── new/page.tsx
 │       │   └── [id]/edit/page.tsx
-│       └── report/
-│           ├── page.tsx        # Laporan L/R format PDF (judul dinamis per brand)
-│           └── export/route.ts # export CSV
+│       ├── report/
+│       │   ├── page.tsx        # Laporan L/R format PDF (judul dinamis per brand)
+│       │   └── export/route.ts # export CSV
+│       └── panduan/
+│           └── page.tsx        # dokumentasi in-app cara pakai sistem
 ├── components/                  # Nav, PeriodPicker, KpiCard, charts, TxnForm, CashFlowForm
 ├── lib/
 │   ├── database.types.ts       # Company/Brand/AppUser/Account/Transaction/CashFlowEntry types

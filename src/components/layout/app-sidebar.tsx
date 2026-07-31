@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ReceiptText, FileBarChart, Sparkles, MoreHorizontal, Leaf, Building2, Wallet } from "lucide-react";
+import { LayoutDashboard, ReceiptText, FileBarChart, Sparkles, MoreHorizontal, Leaf, Building2, Wallet, BookOpen } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,10 @@ const NAV_QUICK: NavItem[] = [
 
 const NAV_ADMIN: NavItem[] = [
   { name: "Master Data", path: "/master-data", icon: <Building2 size={20} /> },
+];
+
+const NAV_HELP: NavItem[] = [
+  { name: "Panduan", path: "/panduan", icon: <BookOpen size={20} /> },
 ];
 
 export function AppSidebar({
@@ -100,6 +104,7 @@ export function AppSidebar({
         {renderGroup("Menu", NAV_MAIN)}
         {renderGroup("Cepat", NAV_QUICK)}
         {isSuperAdmin && renderGroup("Admin", NAV_ADMIN)}
+        {renderGroup("Bantuan", NAV_HELP)}
       </nav>
 
       {expanded && (
