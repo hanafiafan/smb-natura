@@ -10,6 +10,7 @@ Dashboard operasional multi-perusahaan/multi-brand. Tiap brand punya Chart of Ac
 - **Akun Saya** — tiap user bisa ganti password sendiri tanpa lewat Super Admin
 - **Master Data** — tambah/edit/hapus Perusahaan (CV/PT), tambah/edit/hapus Brand di dalamnya, tambah/edit pengguna + assign brand (khusus Super Admin). Hapus Brand menghapus permanen semua data brand itu (COA, Transaksi, Arus Kas, Produk, Anggaran); Perusahaan hanya bisa dihapus setelah semua brand-nya dihapus dulu
 - **Dashboard** — 4 KPI (Omset, Laba Kotor, Laba Op, Laba Bersih) + donut komposisi beban + top 10 + MoM per kategori · filter periode compare
+- **Semua Brand** — ringkasan 4 KPI dijumlahkan dari seluruh brand yang bisa diakses user, + tabel kontribusi per brand dan subtotal per perusahaan
 - **Transaksi** — form input + list dengan filter tanggal/akun/kategori/cari · CRUD lengkap · Export Excel
 - **Arus Kas** — buku kas per brand (Kas Masuk/Keluar, channel & rekening opsional) dengan saldo "Kas Saat Ini" berjalan · CRUD lengkap · Export Excel
 - **Rekening Kas** — daftar bank/e-wallet/saldo marketplace per brand (punya ID sendiri), dipakai sebagai pilihan "Akun" di Arus Kas
@@ -102,6 +103,7 @@ src/
 │       ├── layout.tsx          # session check, brand switcher, sidebar
 │       ├── brand-actions.ts    # switchBrand server action
 │       ├── page.tsx            # /  Dashboard (scoped ke brand aktif)
+│       ├── semua-brand/        # ringkasan KPI gabungan seluruh brand yang bisa diakses
 │       ├── master-data/        # CRUD perusahaan/brand/pengguna (super admin only)
 │       ├── transactions/
 │       │   ├── page.tsx        # list + filter + pagination

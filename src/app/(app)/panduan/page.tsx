@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/session";
 import {
   BookOpen, LayoutDashboard, ReceiptText, Wallet, FileBarChart, Building2,
-  ArrowLeftRight, FileSpreadsheet,
+  ArrowLeftRight, FileSpreadsheet, Layers,
 } from "lucide-react";
 
 export const metadata = { title: "Panduan Penggunaan — SMB Natura" };
@@ -35,6 +35,23 @@ const SECTIONS: Section[] = [
       <>
         <p>Ringkasan kinerja brand aktif untuk periode yang dipilih: Omset, Laba Kotor, Laba Operasional, dan Laba Bersih.</p>
         <p>Ada juga komposisi beban (donut chart), 10 kategori beban terbesar, dan perbandingan bulan-ke-bulan (MoM) per kategori. Gunakan pemilih periode di atas untuk membandingkan dua rentang tanggal.</p>
+      </>
+    ),
+  },
+  {
+    id: "semua-brand",
+    icon: <Layers size={16} />,
+    title: "Semua Brand",
+    body: (
+      <>
+        <p>
+          Ringkasan gabungan seluruh brand yang bisa kamu akses — 4 KPI (Omset, Laba Kotor, Laba Operasional, Laba Bersih)
+          dijumlahkan dari semua brand, jadi tidak perlu ganti-ganti brand satu per satu untuk lihat performa keseluruhan.
+        </p>
+        <p>
+          Di bawahnya ada tabel <strong>Kontribusi per Brand</strong> (diurutkan dari laba bersih terbesar) dan, kalau brand-nya
+          tersebar di lebih dari satu perusahaan, tabel <strong>Subtotal per Perusahaan</strong>.
+        </p>
       </>
     ),
   },
