@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ReceiptText, FileBarChart, Sparkles, MoreHorizontal, Leaf, Building2, Wallet, BookOpen } from "lucide-react";
+import { LayoutDashboard, ReceiptText, FileBarChart, Sparkles, MoreHorizontal, Leaf, Building2, Wallet, BookOpen, Package, Target } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,8 @@ const NAV_MAIN: NavItem[] = [
   { name: "Dashboard", path: "/", icon: <LayoutDashboard size={20} /> },
   { name: "Transaksi", path: "/transactions", icon: <ReceiptText size={20} /> },
   { name: "Arus Kas", path: "/cash-flow", icon: <Wallet size={20} /> },
+  { name: "Produk", path: "/products", icon: <Package size={20} /> },
+  { name: "Anggaran", path: "/anggaran", icon: <Target size={20} /> },
   { name: "Laporan L/R", path: "/report", icon: <FileBarChart size={20} /> },
 ];
 

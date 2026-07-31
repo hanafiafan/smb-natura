@@ -3,8 +3,9 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { ArrowDownCircle, ArrowUpCircle, Calendar, Wallet, FileText, Tag, Landmark, Save, Check } from "lucide-react";
-import type { CashFlowEntry, CashFlowType } from "@/lib/database.types";
+import type { CashAccount, CashFlowEntry, CashFlowType } from "@/lib/database.types";
 import type { ActionState } from "@/app/(app)/cash-flow/actions";
+import { todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const IDR_FORMAT = new Intl.NumberFormat("id-ID");
@@ -12,10 +13,12 @@ const IDR_FORMAT = new Intl.NumberFormat("id-ID");
 export function CashFlowForm({
   action,
   entry,
+  accounts,
   submitLabel = "Simpan Catatan",
 }: {
   action: (state: ActionState, fd: FormData) => Promise<ActionState>;
   entry?: CashFlowEntry | null;
+  accounts: CashAccount[];
   submitLabel?: string;
 }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(action, null);
@@ -86,7 +89,7 @@ export function CashFlowForm({
             name="entry_date"
             required
             className="input"
-            defaultValue={entry?.entry_date ?? new Date().toISOString().slice(0, 10)}
+            defaultValue={entry?.entry_date ?? todayISO()}
           />
           <FieldError err={state?.fieldErrors?.entry_date} />
         </div>
@@ -123,18 +126,19 @@ export function CashFlowForm({
             <p className="text-[11px] mt-1 text-gray-500">Sumber atau tujuan dana.</p>
           </div>
           <div>
-            <label className="label !flex items-center gap-1.5" htmlFor="account_note">
+            <label className="label !flex items-center gap-1.5" htmlFor="account_id">
               <Landmark size={13} /> Akun <span className="text-gray-400 font-normal normal-case">(opsional)</span>
             </label>
-            <input
-              type="text"
-              id="account_note"
-              name="account_note"
-              className="input"
-              defaultValue={entry?.account_note ?? ""}
-              placeholder="Contoh: BCA, Kas Tunai"
-            />
-            <p className="text-[11px] mt-1 text-gray-500">Bank/akun mana yang dipakai.</p>
+            <select id="account_id" name="account_id" className="select" defaultValue={entry?.account_id ?? ""}>
+              <option value="">— Pilih rekening —</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <p className="text-[11px] mt-1 text-gray-500">
+              Bank/akun mana yang dipakai. Belum ada di daftar?{" "}
+              <Link href="/cash-flow/accounts" className="underline" style={{ color: "var(--accent)" }}>Tambah rekening</Link>.
+            </p>
           </div>
         </div>
       </div>

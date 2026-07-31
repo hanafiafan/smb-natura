@@ -33,8 +33,8 @@ export function fmtDate(iso: string): string {
   return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+export function todayISO(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function firstOfMonth(d = new Date()): string {
@@ -43,7 +43,7 @@ export function firstOfMonth(d = new Date()): string {
 
 export function lastOfMonth(d = new Date()): string {
   const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return end.toISOString().slice(0, 10);
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
 }
 
 export function firstOfPrevMonth(d = new Date()): string {

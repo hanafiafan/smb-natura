@@ -11,7 +11,10 @@ Dashboard operasional multi-perusahaan/multi-brand. Tiap brand punya Chart of Ac
 - **Master Data** — tambah/edit Perusahaan (CV/PT), tambah/edit Brand di dalamnya, tambah/edit pengguna + assign brand (khusus Super Admin)
 - **Dashboard** — 4 KPI (Omset, Laba Kotor, Laba Op, Laba Bersih) + donut komposisi beban + top 10 + MoM per kategori · filter periode compare
 - **Transaksi** — form input + list dengan filter tanggal/akun/kategori/cari · CRUD lengkap · Export Excel
-- **Arus Kas** — buku kas per brand (Kas Masuk/Keluar, channel & akun opsional) dengan saldo "Kas Saat Ini" berjalan · CRUD lengkap · Export Excel
+- **Arus Kas** — buku kas per brand (Kas Masuk/Keluar, channel & rekening opsional) dengan saldo "Kas Saat Ini" berjalan · CRUD lengkap · Export Excel
+- **Rekening Kas** — daftar bank/e-wallet/saldo marketplace per brand (punya ID sendiri), dipakai sebagai pilihan "Akun" di Arus Kas
+- **Produk** — master SKU per brand: nama, ukuran, harga jual, HPP bahan baku
+- **Anggaran** — set target per akun COA untuk satu periode, dibandingkan otomatis dengan realisasi transaksi (Target vs Realisasi + % capaian)
 - **Laporan L/R** — tabel P&L format PDF (Deskripsi · Periode A · %A · Periode B · %B · %Var), judul & nama perusahaan mengikuti brand aktif · Print → PDF · Export Excel
 - **Panduan Penggunaan** — dokumentasi in-app cara pakai tiap menu, bagian Master Data hanya tampil untuk Super Admin
 
@@ -43,6 +46,9 @@ psql "$DATABASE_URL" -f db/migrations/002_seed_chart_of_accounts.sql
 psql "$DATABASE_URL" -f db/migrations/003_multi_tenant.sql
 psql "$DATABASE_URL" -f db/migrations/004_cash_flow.sql
 psql "$DATABASE_URL" -f db/migrations/005_login_lockout.sql
+psql "$DATABASE_URL" -f db/migrations/006_cash_accounts.sql
+psql "$DATABASE_URL" -f db/migrations/007_products.sql
+psql "$DATABASE_URL" -f db/migrations/008_budget_targets.sql
 ```
 
 Migrasi 003 otomatis membuat 1 perusahaan default ("CV Loka Bumi Persada") + 1 brand default ("Natura") dan memindahkan Chart of Accounts yang sudah ada ke brand itu — data lama tidak hilang.
@@ -107,8 +113,11 @@ src/
 │       │   ├── page.tsx        # list + saldo "Kas Saat Ini" + filter + pagination
 │       │   ├── actions.ts      # server actions (CRUD)
 │       │   ├── export/route.ts # export CSV
+│       │   ├── accounts/       # CRUD Rekening Kas (bank/e-wallet/marketplace)
 │       │   ├── new/page.tsx
 │       │   └── [id]/edit/page.tsx
+│       ├── products/           # CRUD Produk (SKU/harga jual/HPP)
+│       ├── anggaran/           # set target per akun + laporan Target vs Realisasi
 │       ├── report/
 │       │   ├── page.tsx        # Laporan L/R format PDF (judul dinamis per brand)
 │       │   └── export/route.ts # export CSV
@@ -118,12 +127,12 @@ src/
 │           └── page.tsx        # ganti password sendiri
 ├── components/                  # Nav, PeriodPicker, KpiCard, charts, TxnForm, CashFlowForm
 ├── lib/
-│   ├── database.types.ts       # Company/Brand/AppUser/Account/Transaction/CashFlowEntry types
+│   ├── database.types.ts       # Company/Brand/AppUser/Account/Transaction/CashFlowEntry/Product/BudgetTarget types
 │   ├── db.ts                   # Postgres client (postgres.js)
 │   ├── session.ts              # iron-session + role/brand helpers + password hash
 │   ├── login-lockout.ts        # kebijakan lockout login (pure logic, ada unit test)
 │   ├── brands.ts                # getAccessibleBrands (super admin vs brand admin)
-│   ├── pnl.ts                   # P&L aggregation
+│   ├── pnl.ts                   # P&L aggregation — dipakai ulang oleh Laporan L/R & Anggaran
 │   └── format.ts                # Rp/pct/date helpers
 ├── proxy.ts                     # Next.js 16 middleware (session check)
 └── db/migrations/                # plain SQL, run manually via psql
@@ -131,6 +140,6 @@ src/
 
 ## Yang di-skip (add later kalau perlu)
 
-- Upload PDF parser · Bulk import CSV/Excel · Neraca (Balance Sheet) · Budget vs Actual
+- Upload PDF parser · Bulk import CSV/Excel · Neraca (Balance Sheet)
 
 Dashboard versi awal 1-file (`../index.html`) di-archive sebagai referensi statis.

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, FileSpreadsheet, Wallet, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { CheckCircle2, FileSpreadsheet, Wallet, ArrowDownCircle, ArrowUpCircle, Landmark } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import type { CashFlowEntry } from "@/lib/database.types";
@@ -23,8 +23,8 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const conditions = [sql`brand_id = ${brandId}`, sql`entry_date >= ${start}`, sql`entry_date <= ${end}`];
-  if (q) conditions.push(sql`description ilike ${"%" + q + "%"}`);
+  const conditions = [sql`cfe.brand_id = ${brandId}`, sql`cfe.entry_date >= ${start}`, sql`cfe.entry_date <= ${end}`];
+  if (q) conditions.push(sql`cfe.description ilike ${"%" + q + "%"}`);
   const where = conditions.reduce((acc, c) => sql`${acc} and ${c}`);
 
   const [[{ balance }], [{ count }], entries] = await Promise.all([
@@ -32,10 +32,12 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
       select coalesce(sum(case when type = 'in' then amount else -amount end), 0) as balance
       from cash_flow_entries where brand_id = ${brandId}
     `,
-    sql<{ count: number }[]>`select count(*)::int as count from cash_flow_entries where ${where}`,
-    sql<CashFlowEntry[]>`
-      select * from cash_flow_entries where ${where}
-      order by entry_date desc, created_at desc
+    sql<{ count: number }[]>`select count(*)::int as count from cash_flow_entries cfe where ${where}`,
+    sql<(CashFlowEntry & { account_name: string | null })[]>`
+      select cfe.*, ca.name as account_name
+      from cash_flow_entries cfe left join cash_accounts ca on ca.id = cfe.account_id
+      where ${where}
+      order by cfe.entry_date desc, cfe.created_at desc
       limit ${PAGE_SIZE} offset ${from}
     `,
   ]);
@@ -52,6 +54,9 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/cash-flow/accounts" className="btn-outline">
+            <Landmark size={16} /> Rekening
+          </Link>
           <a href={`/cash-flow/export?${exportQuery(sp)}`} className="btn-outline">
             <FileSpreadsheet size={16} /> Export Excel
           </a>
@@ -117,7 +122,7 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
                   <td style={{ paddingLeft: 12 }}>{fmtDate(e.entry_date)}</td>
                   <td style={{ maxWidth: 240, whiteSpace: "normal" }}>{e.description}</td>
                   <td>{e.channel ?? <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                  <td>{e.account_note ?? <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                  <td>{e.account_name ?? <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td>
                     <span className={`badge ${e.type === "in" ? "badge-pos" : "badge-neg"}`}>
                       {e.type === "in" ? <ArrowDownCircle size={12} /> : <ArrowUpCircle size={12} />}

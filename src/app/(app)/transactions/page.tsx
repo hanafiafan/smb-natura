@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
-import { fmtRpFull, fmtDate } from "@/lib/format";
+import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth } from "@/lib/format";
 import { DeleteBtn } from "@/components/delete-btn";
 import { queryTransactions } from "@/lib/transactions-query";
 import { BrandFilterCard } from "@/components/brand-filter";
@@ -12,16 +12,6 @@ import { BrandFilterCard } from "@/components/brand-filter";
 export const metadata = { title: "Transaksi — SMB Natura" };
 
 const PAGE_SIZE = 50;
-
-function firstOfMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-function lastOfMonth() {
-  const d = new Date();
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return end.toISOString().slice(0, 10);
-}
 
 type SP = {
   start?: string; end?: string;

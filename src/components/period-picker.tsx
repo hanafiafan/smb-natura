@@ -4,6 +4,7 @@ import { CalendarRange } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition } from "react";
 import { PERIOD_MODES, type PeriodMode } from "@/lib/period";
+import { todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function PeriodPicker() {
@@ -84,9 +85,4 @@ export function PeriodPicker() {
       )}
     </div>
   );
-}
-
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

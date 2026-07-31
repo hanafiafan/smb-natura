@@ -61,6 +61,14 @@ export type TransactionWithRelations = Transaction & {
   accounts: Pick<Account, "code" | "name" | "section" | "category"> | null;
 };
 
+export type CashAccount = {
+  id: number;
+  brand_id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 export type CashFlowType = "in" | "out";
 
 export type CashFlowEntry = {
@@ -69,9 +77,33 @@ export type CashFlowEntry = {
   entry_date: string;
   description: string;
   channel: string | null;
-  account_note: string | null;
+  account_id: number | null;
   type: CashFlowType;
   amount: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Product = {
+  id: number;
+  brand_id: number;
+  sku: string;
+  name: string;
+  size_label: string | null;
+  price: number;
+  cogs: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetTarget = {
+  id: number;
+  brand_id: number;
+  account_id: number;
+  period_start: string;
+  period_end: string;
+  target_amount: number;
   created_at: string;
   updated_at: string;
 };

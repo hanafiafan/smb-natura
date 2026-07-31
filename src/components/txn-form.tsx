@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDownCircle, ArrowUpCircle, Check, Calendar, Wallet, FileText, Hash, Save, CircleHelp } from "lucide-react";
 import type { Account, Transaction } from "@/lib/database.types";
 import type { ActionState } from "@/app/(app)/transactions/actions";
+import { todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Flow = "in" | "out";
@@ -72,7 +73,7 @@ export function TxnForm({
   const [group, setGroup] = useState<string | null>(initialGroup);
   const [accountId, setAccountId] = useState<number | "">(txn?.account_id ?? "");
   const [amountRaw, setAmountRaw] = useState<string>(txn?.amount ? String(txn.amount) : "");
-  const [txnDate, setTxnDate] = useState<string>(txn?.txn_date ?? new Date().toISOString().slice(0, 10));
+  const [txnDate, setTxnDate] = useState<string>(txn?.txn_date ?? todayISO());
 
   const groups = flow === "in" ? IN_GROUPS : OUT_GROUPS;
 

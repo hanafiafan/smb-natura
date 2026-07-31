@@ -15,12 +15,15 @@ export async function GET(request: Request) {
   const end = sp.end ?? lastOfMonth();
   const q = sp.q?.trim();
 
-  const conditions = [sql`brand_id = ${brandId}`, sql`entry_date >= ${start}`, sql`entry_date <= ${end}`];
-  if (q) conditions.push(sql`description ilike ${"%" + q + "%"}`);
+  const conditions = [sql`cfe.brand_id = ${brandId}`, sql`cfe.entry_date >= ${start}`, sql`cfe.entry_date <= ${end}`];
+  if (q) conditions.push(sql`cfe.description ilike ${"%" + q + "%"}`);
   const where = conditions.reduce((acc, c) => sql`${acc} and ${c}`);
 
-  const entries = await sql<CashFlowEntry[]>`
-    select * from cash_flow_entries where ${where} order by entry_date desc, created_at desc
+  const entries = await sql<(CashFlowEntry & { account_name: string | null })[]>`
+    select cfe.*, ca.name as account_name
+    from cash_flow_entries cfe left join cash_accounts ca on ca.id = cfe.account_id
+    where ${where}
+    order by cfe.entry_date desc, cfe.created_at desc
   `;
 
   const rows: (string | number)[][] = [
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
       fmtDate(e.entry_date),
       e.description,
       e.channel ?? "",
-      e.account_note ?? "",
+      e.account_name ?? "",
       e.type === "in" ? "Masuk" : "Keluar",
       Math.round(Number(e.amount)),
     ]),

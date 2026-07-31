@@ -10,7 +10,7 @@ const CashFlowSchema = z.object({
   entry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
   description: z.string().trim().min(1, "Keterangan wajib diisi").max(500),
   channel: z.string().max(200).optional().transform((v) => v?.trim() || null),
-  account_note: z.string().max(200).optional().transform((v) => v?.trim() || null),
+  account_id: z.string().optional().transform((v) => (v && v.trim() ? Number(v) : null)),
   type: z.enum(["in", "out"]),
   amount: z.coerce.number().finite().positive("Jumlah harus lebih dari 0"),
 });
@@ -24,7 +24,7 @@ async function parseAndPack(formData: FormData) {
     entry_date: formData.get("entry_date"),
     description: formData.get("description"),
     channel: formData.get("channel") ?? "",
-    account_note: formData.get("account_note") ?? "",
+    account_id: formData.get("account_id") ?? "",
     type: formData.get("type"),
     amount: rawAmount,
   });
@@ -42,7 +42,7 @@ export async function createCashFlowEntry(_prev: ActionState, formData: FormData
   await sql`
     insert into cash_flow_entries ${sql(
       { ...data, brand_id: session.activeBrandId! },
-      "brand_id", "entry_date", "description", "channel", "account_note", "type", "amount",
+      "brand_id", "entry_date", "description", "channel", "account_id", "type", "amount",
     )}
   `;
 
@@ -56,7 +56,7 @@ export async function updateCashFlowEntry(id: string, _prev: ActionState, formDa
 
   const session = await getSession();
   await sql`
-    update cash_flow_entries set ${sql(data, "entry_date", "description", "channel", "account_note", "type", "amount")}
+    update cash_flow_entries set ${sql(data, "entry_date", "description", "channel", "account_id", "type", "amount")}
     where id = ${id} and brand_id = ${session.activeBrandId!}
   `;
 
