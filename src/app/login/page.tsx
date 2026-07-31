@@ -85,7 +85,7 @@ export default async function LoginPage({
           <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-center gap-2 text-[11px]"
             style={{ color: "var(--muted)" }}>
             <ShieldCheck size={13} />
-            <span>Data Anda terlindungi. Session aman via Supabase.</span>
+            <span>Data Anda terlindungi. Session terenkripsi.</span>
           </div>
         </div>
 

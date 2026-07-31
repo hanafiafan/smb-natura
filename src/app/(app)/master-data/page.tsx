@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Tag, Users, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, Tag, Users, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
 import { toggleBrandActive, deleteUser } from "./actions";
@@ -82,7 +82,12 @@ export default async function MasterDataPage() {
           <div className="space-y-4">
             {companies.map((c) => (
               <div key={c.id} className="rounded-xl border border-gray-200 p-4">
-                <div className="font-semibold text-sm text-gray-900 mb-2">{c.name}</div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="font-semibold text-sm text-gray-900">{c.name}</div>
+                  <Link href={`/master-data/companies/${c.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>
+                    Edit
+                  </Link>
+                </div>
                 {c.brands.length === 0 ? (
                   <p className="text-xs" style={{ color: "var(--muted)" }}>Belum ada brand.</p>
                 ) : (
@@ -90,6 +95,9 @@ export default async function MasterDataPage() {
                     {c.brands.map((b) => (
                       <div key={b.id} className="chip" style={!b.is_active ? { opacity: 0.5 } : undefined}>
                         {b.name}
+                        <Link href={`/master-data/brands/${b.id}/edit`} title="Edit brand">
+                          <Pencil size={12} />
+                        </Link>
                         <form action={toggleBrandActive.bind(null, b.id)}>
                           <button type="submit" title={b.is_active ? "Nonaktifkan brand" : "Aktifkan brand"}>
                             {b.is_active ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
@@ -123,9 +131,12 @@ export default async function MasterDataPage() {
                   <td>{u.role === "super_admin" ? "Super Admin" : "Admin Brand"}</td>
                   <td>{u.brand_names.join(", ") || "—"}</td>
                   <td>
-                    <form action={deleteUser.bind(null, u.id)} className="flex justify-end">
-                      <button type="submit" className="text-xs" style={{ color: "var(--neg)" }}>Hapus</button>
-                    </form>
+                    <div className="flex gap-3 justify-end">
+                      <Link href={`/master-data/users/${u.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
+                      <form action={deleteUser.bind(null, u.id)}>
+                        <button type="submit" className="text-xs" style={{ color: "var(--neg)" }}>Hapus</button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}

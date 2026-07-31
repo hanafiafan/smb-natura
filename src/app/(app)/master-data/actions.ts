@@ -22,6 +22,16 @@ export async function createCompany(formData: FormData) {
   redirect("/master-data");
 }
 
+export async function updateCompany(id: number, formData: FormData) {
+  await requireSuperAdmin();
+  const parsed = CompanySchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) fail(`/master-data/companies/${id}/edit`, parsed.error.issues[0].message);
+
+  await sql`update companies set name = ${parsed.data.name} where id = ${id}`;
+  revalidatePath("/master-data");
+  redirect("/master-data");
+}
+
 const BrandSchema = z.object({
   company_id: z.coerce.number().int().positive("Pilih perusahaan"),
   name: z.string().trim().min(2, "Nama brand minimal 2 karakter"),
@@ -49,6 +59,19 @@ export async function createBrand(formData: FormData) {
     `;
   }
 
+  revalidatePath("/master-data");
+  redirect("/master-data");
+}
+
+export async function updateBrand(id: number, formData: FormData) {
+  await requireSuperAdmin();
+  const parsed = BrandSchema.safeParse({
+    company_id: formData.get("company_id"),
+    name: formData.get("name"),
+  });
+  if (!parsed.success) fail(`/master-data/brands/${id}/edit`, parsed.error.issues[0].message);
+
+  await sql`update brands set company_id = ${parsed.data.company_id}, name = ${parsed.data.name} where id = ${id}`;
   revalidatePath("/master-data");
   redirect("/master-data");
 }
@@ -95,6 +118,48 @@ export async function createUser(formData: FormData) {
   if (parsed.data.role === "brand_admin" && parsed.data.brand_ids?.length) {
     for (const brandId of parsed.data.brand_ids) {
       await sql`insert into user_brands (user_id, brand_id) values (${userId}, ${brandId})`;
+    }
+  }
+
+  revalidatePath("/master-data");
+  redirect("/master-data");
+}
+
+const UserUpdateSchema = z.object({
+  email: z.email(),
+  password: z.union([z.string().length(0), z.string().min(6, "Password minimal 6 karakter")]),
+  role: z.enum(["super_admin", "brand_admin"]),
+  brand_ids: z.array(z.coerce.number().int()).optional(),
+});
+
+export async function updateUser(id: string, formData: FormData) {
+  await requireSuperAdmin();
+  const parsed = UserUpdateSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password") ?? "",
+    role: formData.get("role"),
+    brand_ids: formData.getAll("brand_ids"),
+  });
+  if (!parsed.success) fail(`/master-data/users/${id}/edit`, parsed.error.issues[0].message);
+  if (parsed.data.role === "brand_admin" && !parsed.data.brand_ids?.length) {
+    fail(`/master-data/users/${id}/edit`, "Pilih minimal 1 brand untuk Admin Brand.");
+  }
+
+  try {
+    if (parsed.data.password) {
+      const passwordHash = hashPassword(parsed.data.password);
+      await sql`update users set email = ${parsed.data.email}, role = ${parsed.data.role}, password_hash = ${passwordHash} where id = ${id}`;
+    } else {
+      await sql`update users set email = ${parsed.data.email}, role = ${parsed.data.role} where id = ${id}`;
+    }
+  } catch {
+    fail(`/master-data/users/${id}/edit`, "Email sudah dipakai akun lain.");
+  }
+
+  await sql`delete from user_brands where user_id = ${id}`;
+  if (parsed.data.role === "brand_admin" && parsed.data.brand_ids?.length) {
+    for (const brandId of parsed.data.brand_ids) {
+      await sql`insert into user_brands (user_id, brand_id) values (${id}, ${brandId})`;
     }
   }
 
