@@ -29,6 +29,11 @@ export function BrandFilterCard({
     setBrandId(brands.find((b) => b.company_name === next)?.id);
   }
 
+  function handleBrandChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setBrandId(Number(e.target.value));
+    e.currentTarget.form?.requestSubmit();
+  }
+
   const qs = searchParams.toString();
   const redirectTo = qs ? `${pathname}?${qs}` : pathname;
 
@@ -64,12 +69,11 @@ export function BrandFilterCard({
             name="brand_id"
             className="select"
             value={brandId}
-            onChange={(e) => setBrandId(Number(e.target.value))}
+            onChange={handleBrandChange}
           >
             {brandsInCompany.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
-        <button type="submit" className="btn">Tampilkan</button>
       </div>
     </form>
   );
