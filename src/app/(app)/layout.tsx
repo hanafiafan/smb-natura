@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
 import { Backdrop } from "@/components/layout/backdrop";
+import { switchBrand } from "./brand-actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -27,7 +28,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex-1 flex flex-col min-w-0">
           <AppHeader email={session.email} brands={brands} activeBrandId={session.activeBrandId} />
           <main className="flex-1 p-4 md:p-6 max-w-[1536px] w-full mx-auto">
-            {activeBrand ? children : (
+            {activeBrand ? children : brands.length > 0 ? (
+              // Session's activeBrandId points at a brand that's gone/inactive/unassigned —
+              // this can't rely on the header switcher, which hides itself when there's only
+              // one brand to pick (it assumes that one is already active).
+              <div className="card p-12 text-center max-w-lg mx-auto mt-10">
+                <p className="mb-2 text-lg font-semibold">Pilih brand yang ingin dilihat</p>
+                <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
+                  Brand yang tadinya aktif sudah tidak tersedia lagi.
+                </p>
+                <div className="flex flex-col gap-2 max-w-xs mx-auto">
+                  {brands.map((b) => (
+                    <form key={b.id} action={switchBrand}>
+                      <input type="hidden" name="brand_id" value={b.id} />
+                      <button type="submit" className="btn-outline w-full">{b.company_name} — {b.name}</button>
+                    </form>
+                  ))}
+                </div>
+              </div>
+            ) : (
               <div className="card p-12 text-center max-w-lg mx-auto mt-10">
                 <p className="mb-2 text-lg font-semibold">Belum ada brand yang bisa diakses</p>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>

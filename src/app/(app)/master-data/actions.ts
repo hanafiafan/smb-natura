@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { hashPassword, requireSuperAdmin } from "@/lib/session";
+import { COA_TEMPLATE } from "@/lib/coa-template";
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -49,15 +50,13 @@ export async function createBrand(formData: FormData) {
     insert into brands (company_id, name) values (${parsed.data.company_id}, ${parsed.data.name}) returning id
   `;
 
-  // Give every new brand its own starter Chart of Accounts, copied from the Natura template.
-  const [template] = await sql<{ id: number }[]>`select id from brands where name = 'Natura' order by id limit 1`;
-  if (template) {
-    await sql`
-      insert into accounts (brand_id, code, name, section, category, sign, sort_order, is_active)
-      select ${brand.id}, code, name, section, category, sign, sort_order, is_active
-      from accounts where brand_id = ${template.id}
-    `;
-  }
+  // Give every new brand its own starter Chart of Accounts. Uses a static template (not a
+  // copy of some other brand's live rows) so deleting/renaming any brand — Natura included —
+  // can never break COA seeding for brands created afterward.
+  const rows = COA_TEMPLATE.map((r) => ({ ...r, brand_id: brand.id, is_active: true }));
+  await sql`
+    insert into accounts ${sql(rows, "brand_id", "code", "name", "section", "category", "sign", "sort_order", "is_active")}
+  `;
 
   revalidatePath("/master-data");
   redirect("/master-data");

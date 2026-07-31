@@ -32,13 +32,21 @@ async function parseAndPack(formData: FormData) {
   return { error: null, fieldErrors: null, data: parsed.data };
 }
 
+async function accountBelongsToBrand(accountId: number, brandId: number): Promise<boolean> {
+  const [account] = await sql<{ id: number }[]>`select id from accounts where id = ${accountId} and brand_id = ${brandId}`;
+  return !!account;
+}
+
 export async function createTransaction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const { fieldErrors, data } = await parseAndPack(formData);
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
   const session = await getSession();
+  const brandId = session.activeBrandId!;
+  if (!(await accountBelongsToBrand(data.account_id, brandId))) return { error: "Akun tidak ditemukan di brand ini." };
+
   await sql`
-    insert into transactions ${sql({ ...data, brand_id: session.activeBrandId! }, "brand_id", "txn_date", "account_id", "amount", "description", "reference")}
+    insert into transactions ${sql({ ...data, brand_id: brandId }, "brand_id", "txn_date", "account_id", "amount", "description", "reference")}
   `;
 
   revalidatePath("/transactions");
@@ -51,9 +59,12 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
   const session = await getSession();
+  const brandId = session.activeBrandId!;
+  if (!(await accountBelongsToBrand(data.account_id, brandId))) return { error: "Akun tidak ditemukan di brand ini." };
+
   await sql`
     update transactions set ${sql(data, "txn_date", "account_id", "amount", "description", "reference")}
-    where id = ${id} and brand_id = ${session.activeBrandId!}
+    where id = ${id} and brand_id = ${brandId}
   `;
 
   revalidatePath("/transactions");
