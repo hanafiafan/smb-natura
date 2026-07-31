@@ -27,6 +27,8 @@ export type AppUser = {
   email: string;
   password_hash: string;
   role: UserRole;
+  failed_attempts: number;
+  locked_until: string | null;
   created_at: string;
 };
 

@@ -6,7 +6,8 @@ Dashboard operasional multi-perusahaan/multi-brand. Tiap brand punya Chart of Ac
 
 ## Fitur
 
-- **Login multi-user** — Super Admin (akses semua perusahaan & brand) atau Admin Brand (akses brand yang ditautkan saja)
+- **Login multi-user** — Super Admin (akses semua perusahaan & brand) atau Admin Brand (akses brand yang ditautkan saja) · akun terkunci 15 menit setelah 5x salah password berturut-turut
+- **Akun Saya** — tiap user bisa ganti password sendiri tanpa lewat Super Admin
 - **Master Data** — tambah/edit Perusahaan (CV/PT), tambah/edit Brand di dalamnya, tambah/edit pengguna + assign brand (khusus Super Admin)
 - **Dashboard** — 4 KPI (Omset, Laba Kotor, Laba Op, Laba Bersih) + donut komposisi beban + top 10 + MoM per kategori · filter periode compare
 - **Transaksi** — form input + list dengan filter tanggal/akun/kategori/cari · CRUD lengkap · Export Excel
@@ -24,6 +25,14 @@ cp .env.example .env.local          # isi DATABASE_URL, SESSION_SECRET
 npm run dev                          # http://localhost:3000
 ```
 
+## Testing
+
+Unit test untuk logic kritis (hash/verify password, lockout policy, format CSV) pakai Vitest:
+
+```bash
+npm test
+```
+
 ## Setup database dari nol
 
 Butuh Postgres (self-host, VPS mana pun, atau Docker lokal). Jalankan migrasi via `psql` **berurutan**:
@@ -33,6 +42,7 @@ psql "$DATABASE_URL" -f db/migrations/001_init_schema.sql
 psql "$DATABASE_URL" -f db/migrations/002_seed_chart_of_accounts.sql
 psql "$DATABASE_URL" -f db/migrations/003_multi_tenant.sql
 psql "$DATABASE_URL" -f db/migrations/004_cash_flow.sql
+psql "$DATABASE_URL" -f db/migrations/005_login_lockout.sql
 ```
 
 Migrasi 003 otomatis membuat 1 perusahaan default ("CV Loka Bumi Persada") + 1 brand default ("Natura") dan memindahkan Chart of Accounts yang sudah ada ke brand itu — data lama tidak hilang.
@@ -102,13 +112,16 @@ src/
 │       ├── report/
 │       │   ├── page.tsx        # Laporan L/R format PDF (judul dinamis per brand)
 │       │   └── export/route.ts # export CSV
-│       └── panduan/
-│           └── page.tsx        # dokumentasi in-app cara pakai sistem
+│       ├── panduan/
+│       │   └── page.tsx        # dokumentasi in-app cara pakai sistem
+│       └── account/
+│           └── page.tsx        # ganti password sendiri
 ├── components/                  # Nav, PeriodPicker, KpiCard, charts, TxnForm, CashFlowForm
 ├── lib/
 │   ├── database.types.ts       # Company/Brand/AppUser/Account/Transaction/CashFlowEntry types
 │   ├── db.ts                   # Postgres client (postgres.js)
 │   ├── session.ts              # iron-session + role/brand helpers + password hash
+│   ├── login-lockout.ts        # kebijakan lockout login (pure logic, ada unit test)
 │   ├── brands.ts                # getAccessibleBrands (super admin vs brand admin)
 │   ├── pnl.ts                   # P&L aggregation
 │   └── format.ts                # Rp/pct/date helpers

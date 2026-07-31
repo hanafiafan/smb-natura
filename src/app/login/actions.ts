@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { getSession, verifyPassword } from "@/lib/session";
+import { isLocked, minutesRemaining, afterFailedAttempt, RESET_STATE } from "@/lib/login-lockout";
 import type { AppUser } from "@/lib/database.types";
 
 const LoginSchema = z.object({
@@ -22,10 +23,32 @@ export async function login(formData: FormData) {
   }
 
   const [user] = await sql<AppUser[]>`select * from users where email = ${parsed.data.email}`;
+
+  if (user && isLocked(user)) {
+    const msg = encodeURIComponent(
+      `Akun terkunci sementara karena terlalu banyak percobaan gagal. Coba lagi dalam ${minutesRemaining(user)} menit.`,
+    );
+    redirect(`/login?error=${msg}&email=${encodeURIComponent(parsed.data.email)}`);
+  }
+
   if (!user || !verifyPassword(parsed.data.password, user.password_hash)) {
+    if (user) {
+      const next = afterFailedAttempt(user);
+      await sql`update users set failed_attempts = ${next.failed_attempts}, locked_until = ${next.locked_until} where id = ${user.id}`;
+      if (next.locked_until) {
+        const msg = encodeURIComponent(
+          `Akun terkunci sementara karena terlalu banyak percobaan gagal. Coba lagi dalam ${minutesRemaining(next)} menit.`,
+        );
+        redirect(`/login?error=${msg}&email=${encodeURIComponent(parsed.data.email)}`);
+      }
+    }
     const msg = encodeURIComponent("Email atau password salah.");
     const email = encodeURIComponent(parsed.data.email);
     redirect(`/login?error=${msg}&email=${email}`);
+  }
+
+  if (user.failed_attempts > 0 || user.locked_until) {
+    await sql`update users set failed_attempts = ${RESET_STATE.failed_attempts}, locked_until = ${RESET_STATE.locked_until} where id = ${user.id}`;
   }
 
   const activeBrandId =

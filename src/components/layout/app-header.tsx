@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Menu, X, LogOut } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { logout } from "@/app/login/actions";
@@ -61,10 +62,14 @@ export function AppHeader({
             <div className="text-sm font-semibold text-gray-800">{brands[0].company_name} — {brands[0].name}</div>
           </div>
         ) : null}
-        <div className="w-9 h-9 rounded-full grid place-items-center text-white font-bold text-sm shrink-0 shadow-brand-sm"
-          style={{ background: "linear-gradient(135deg, var(--color-brand-500), var(--color-brand-700))" }}>
+        <Link
+          href="/account"
+          title="Akun Saya / Ganti Password"
+          className="w-9 h-9 rounded-full grid place-items-center text-white font-bold text-sm shrink-0 shadow-brand-sm"
+          style={{ background: "linear-gradient(135deg, var(--color-brand-500), var(--color-brand-700))" }}
+        >
           {initial}
-        </div>
+        </Link>
         <form action={logout}>
           <button type="submit" className="btn-outline text-xs h-10 px-3.5" title="Keluar">
             <LogOut size={14} />
