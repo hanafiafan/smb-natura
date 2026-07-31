@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Building2, Tag, Users, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
+import { DeleteBrandBtn } from "@/components/delete-brand-btn";
+import { DeleteCompanyBtn } from "@/components/delete-company-btn";
 import { toggleBrandActive, deleteUser } from "./actions";
 
 export const metadata = { title: "Master Data — SMB Natura" };
@@ -87,6 +89,7 @@ export default async function MasterDataPage() {
                   <Link href={`/master-data/companies/${c.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>
                     Edit
                   </Link>
+                  {c.brands.length === 0 && <DeleteCompanyBtn id={c.id} name={c.name} />}
                 </div>
                 {c.brands.length === 0 ? (
                   <p className="text-xs" style={{ color: "var(--muted)" }}>Belum ada brand.</p>
@@ -103,9 +106,15 @@ export default async function MasterDataPage() {
                             {b.is_active ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                           </button>
                         </form>
+                        <DeleteBrandBtn id={b.id} name={b.name} />
                       </div>
                     ))}
                   </div>
+                )}
+                {c.brands.length > 0 && (
+                  <p className="text-[11px] mt-2" style={{ color: "var(--muted)" }}>
+                    Hapus semua brand di atas dulu untuk bisa menghapus perusahaan ini.
+                  </p>
                 )}
               </div>
             ))}

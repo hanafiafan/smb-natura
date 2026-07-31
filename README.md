@@ -8,7 +8,7 @@ Dashboard operasional multi-perusahaan/multi-brand. Tiap brand punya Chart of Ac
 
 - **Login multi-user** — Super Admin (akses semua perusahaan & brand) atau Admin Brand (akses brand yang ditautkan saja) · akun terkunci 15 menit setelah 5x salah password berturut-turut
 - **Akun Saya** — tiap user bisa ganti password sendiri tanpa lewat Super Admin
-- **Master Data** — tambah/edit Perusahaan (CV/PT), tambah/edit Brand di dalamnya, tambah/edit pengguna + assign brand (khusus Super Admin)
+- **Master Data** — tambah/edit/hapus Perusahaan (CV/PT), tambah/edit/hapus Brand di dalamnya, tambah/edit pengguna + assign brand (khusus Super Admin). Hapus Brand menghapus permanen semua data brand itu (COA, Transaksi, Arus Kas, Produk, Anggaran); Perusahaan hanya bisa dihapus setelah semua brand-nya dihapus dulu
 - **Dashboard** — 4 KPI (Omset, Laba Kotor, Laba Op, Laba Bersih) + donut komposisi beban + top 10 + MoM per kategori · filter periode compare
 - **Transaksi** — form input + list dengan filter tanggal/akun/kategori/cari · CRUD lengkap · Export Excel
 - **Arus Kas** — buku kas per brand (Kas Masuk/Keluar, channel & rekening opsional) dengan saldo "Kas Saat Ini" berjalan · CRUD lengkap · Export Excel

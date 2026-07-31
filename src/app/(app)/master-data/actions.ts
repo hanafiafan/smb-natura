@@ -82,6 +82,22 @@ export async function toggleBrandActive(brandId: number) {
   revalidatePath("/master-data");
 }
 
+// Cascades to accounts, transactions, cash_flow_entries, cash_accounts, products,
+// budget_targets, and user_brands for this brand — all FKs are ON DELETE CASCADE.
+export async function deleteBrand(brandId: number) {
+  await requireSuperAdmin();
+  await sql`delete from brands where id = ${brandId}`;
+  revalidatePath("/master-data");
+}
+
+// companies.brands is ON DELETE RESTRICT — the UI only shows this action once a
+// company has zero brands left, so this should always succeed.
+export async function deleteCompany(companyId: number) {
+  await requireSuperAdmin();
+  await sql`delete from companies where id = ${companyId}`;
+  revalidatePath("/master-data");
+}
+
 const UserSchema = z.object({
   email: z.email(),
   password: z.string().min(6, "Password minimal 6 karakter"),
