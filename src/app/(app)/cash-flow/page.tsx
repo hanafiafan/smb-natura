@@ -29,9 +29,11 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
   if (q) conditions.push(sql`cfe.description ilike ${"%" + q + "%"}`);
   const where = conditions.reduce((acc, c) => sql`${acc} and ${c}`);
 
-  const [[{ balance }], [{ count }], entries, brands] = await Promise.all([
-    sql<{ balance: number }[]>`
-      select coalesce(sum(case when type = 'in' then amount else -amount end), 0) as balance
+  const [[{ periodBalance, realtimeBalance }], [{ count }], entries, brands] = await Promise.all([
+    sql<{ periodBalance: number; realtimeBalance: number }[]>`
+      select 
+        coalesce(sum(case when entry_date <= ${end} then (case when type = 'in' then amount else -amount end) else 0 end), 0)::float as "periodBalance",
+        coalesce(sum(case when type = 'in' then amount else -amount end), 0)::float as "realtimeBalance"
       from cash_flow_entries where brand_id = ${brandId}
     `,
     sql<{ count: number }[]>`select count(*)::int as count from cash_flow_entries cfe where ${where}`,
@@ -69,14 +71,27 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
 
       <BrandFilterCard brands={brands} activeBrandId={brandId} />
 
-      <div className="card p-5" style={{ background: "linear-gradient(135deg, var(--color-brand-50) 0%, #ffffff 60%)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl grid place-items-center shrink-0 shadow-theme-xs" style={{ background: "var(--accent)", color: "white" }}>
-            <Wallet size={20} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="card p-5" style={{ background: "linear-gradient(135deg, var(--color-brand-50) 0%, #ffffff 60%)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl grid place-items-center shrink-0 shadow-theme-xs" style={{ background: "var(--accent)", color: "white" }}>
+              <Wallet size={20} />
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider font-bold" style={{ color: "var(--muted)" }}>Saldo Per {fmtDate(end)}</div>
+              <div className="text-2xl font-bold tracking-tight" style={{ color: "var(--accent)" }}>{fmtRpFull(periodBalance)}</div>
+            </div>
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider font-bold" style={{ color: "var(--muted)" }}>Kas Saat Ini</div>
-            <div className="text-2xl font-bold tracking-tight" style={{ color: "var(--accent)" }}>{fmtRpFull(balance)}</div>
+        </div>
+        <div className="card p-5" style={{ background: "#f9fafb" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl grid place-items-center shrink-0 shadow-theme-xs bg-gray-200 text-gray-700">
+              <Landmark size={20} />
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-wider font-bold text-gray-500">Kas Real-Time (All-Time)</div>
+              <div className="text-2xl font-bold tracking-tight text-gray-800">{fmtRpFull(realtimeBalance)}</div>
+            </div>
           </div>
         </div>
       </div>
