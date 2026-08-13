@@ -17,19 +17,40 @@ const IN_GROUPS = [
   { key: "Non-Op", label: "Pendapatan Lain", desc: "Bunga bank, penyesuaian marketplace, dll" },
 ] as const;
 
-const OUT_GROUPS = [
-  { key: "HPP", label: "Modal / HPP", desc: "Harga pokok barang yang dijual" },
-  { key: "Gaji", label: "Gaji & Karyawan", desc: "Gaji, THR, tunjangan, BPJS" },
-  { key: "Kantor", label: "Biaya Kantor", desc: "Listrik, ATK, aplikasi, sewa peralatan" },
-  { key: "Pemasaran", label: "Iklan & Promosi", desc: "TikTok Ads, Shopee, branding" },
-  { key: "Fee E-Commerce", label: "Fee Marketplace", desc: "Admin & proses pesanan Shopee/TikTok" },
-  { key: "Produksi", label: "Produksi & Packaging", desc: "Kemasan, perlengkapan gudang" },
-  { key: "Sewa", label: "Sewa", desc: "Sewa gedung, kendaraan" },
-  { key: "Penyusutan", label: "Penyusutan", desc: "Depresiasi mesin/inventaris" },
-  { key: "Ops Lainnya", label: "Operasional Lain", desc: "CSR, biaya operasional lain-lain" },
-  { key: "Non-Op-Beban", label: "Beban Lain", desc: "Adm bank, pajak jasa giro, penyesuaian kas" },
-  { key: "Pajak", label: "Pajak Penghasilan", desc: "PPh perusahaan" },
-] as const;
+// Friendly copy for known opex categories. Any category not listed here (added later
+// via Master Data > Akun & Kategori) still shows up as its own group, just using the
+// raw category text as the label — see buildOutGroups().
+const OUT_META: Record<string, { label: string; desc: string }> = {
+  Gaji: { label: "Gaji & Karyawan", desc: "Gaji, THR, tunjangan, BPJS" },
+  Kantor: { label: "Biaya Kantor", desc: "Listrik, ATK, aplikasi, sewa peralatan" },
+  Pemasaran: { label: "Iklan & Promosi", desc: "TikTok Ads, Shopee, branding" },
+  "Fee E-Commerce": { label: "Fee Marketplace", desc: "Admin & proses pesanan Shopee/TikTok" },
+  Produksi: { label: "Produksi & Packaging", desc: "Kemasan, perlengkapan gudang" },
+  Sewa: { label: "Sewa", desc: "Sewa gedung, kendaraan" },
+  Penyusutan: { label: "Penyusutan", desc: "Depresiasi mesin/inventaris" },
+  "Ops Lainnya": { label: "Operasional Lain", desc: "CSR, biaya operasional lain-lain" },
+};
+
+/** Kategori "Biaya Operasional" dibangun dari data akun (bukan daftar statis) supaya
+ * kategori baru yang ditambahkan lewat Master Data langsung muncul di sini. */
+function buildOutGroups(accounts: Account[]) {
+  const opexOrder = new Map<string, number>();
+  for (const a of accounts) {
+    if (a.section === "opex" && a.category && !opexOrder.has(a.category)) {
+      opexOrder.set(a.category, a.sort_order);
+    }
+  }
+  const opexGroups = [...opexOrder.keys()]
+    .sort((x, y) => opexOrder.get(x)! - opexOrder.get(y)!)
+    .map((category) => ({ key: category, ...(OUT_META[category] ?? { label: category, desc: "Kategori kustom" }) }));
+
+  return [
+    { key: "HPP", label: "Modal / HPP", desc: "Harga pokok barang yang dijual" },
+    ...opexGroups,
+    { key: "Non-Op-Beban", label: "Beban Lain", desc: "Adm bank, pajak jasa giro, penyesuaian kas" },
+    { key: "Pajak", label: "Pajak Penghasilan", desc: "PPh perusahaan" },
+  ];
+}
 
 /** Petakan akun ke grup ramah-user */
 function accountGroup(a: Account): string | null {
@@ -75,7 +96,8 @@ export function TxnForm({
   const [amountRaw, setAmountRaw] = useState<string>(txn?.amount ? String(txn.amount) : "");
   const [txnDate, setTxnDate] = useState<string>(txn?.txn_date ?? todayISO());
 
-  const groups = flow === "in" ? IN_GROUPS : OUT_GROUPS;
+  const outGroups = useMemo(() => buildOutGroups(accounts), [accounts]);
+  const groups = flow === "in" ? IN_GROUPS : outGroups;
 
   // Filter accounts by selected group
   const accountsInGroup = useMemo(() => {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Tag, Users, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { Building2, Tag, Users, CheckCircle2, XCircle, Pencil, ListTree } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
 import { DeleteBrandBtn } from "@/components/delete-brand-btn";
@@ -66,6 +66,16 @@ export default async function MasterDataPage() {
         <h1 className="text-xl font-bold">Master Data</h1>
         <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
           Kelola perusahaan, brand, dan akun pengguna.
+        </p>
+      </div>
+
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold flex items-center gap-2"><ListTree size={16} /> Akun & Kategori Transaksi</h2>
+          <Link href="/master-data/accounts" className="btn text-xs"><ListTree size={14} /> Kelola Akun</Link>
+        </div>
+        <p className="text-xs" style={{ color: "var(--muted)" }}>
+          Tambah ID akun atau kategori baru untuk brand aktif (mis. akun sewa baru di kategori &quot;Sewa&quot;) yang dipakai saat Catat Transaksi.
         </p>
       </div>
 
