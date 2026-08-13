@@ -7,6 +7,16 @@ function esc(v: string | number): string {
   return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+// Formula-injection guard for untrusted free text (account/category names, descriptions,
+// channels — anything a brand admin typed) — NOT for pre-formatted numeric strings like
+// numCell()'s output, where a leading "-" is a legitimate negative number and must stay
+// parseable by Excel. A cell starting with =, +, -, or @ otherwise runs as a live formula
+// when opened in Excel/Sheets; prefixing with a tab neutralizes it invisibly.
+export function csvText(v: string | null | undefined): string {
+  const s = v ?? "";
+  return /^[=+\-@]/.test(s) ? `\t${s}` : s;
+}
+
 export function toCsv(rows: (string | number)[][]): string {
   return rows.map((r) => r.map(esc).join(DELIM)).join("\r\n");
 }

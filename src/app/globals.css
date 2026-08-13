@@ -276,4 +276,7 @@ button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   .pnl-print thead th { background: white !important; }
   .pnl-print .row-total td { background: #f2f6f2 !important; }
   .pnl-print tr { page-break-inside: avoid; }
+  /* Scroll containers don't paginate — let wide tables expand to full width instead
+     of being clipped to whatever fit on screen. */
+  .overflow-x-auto { overflow: visible !important; }
 }
