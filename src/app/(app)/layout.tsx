@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
+import type { UserRole } from "@/lib/database.types";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
@@ -13,7 +15,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // treat those as logged out so they re-authenticate under the new session shape.
   if (!session.email || !session.userId || !session.role) redirect("/login");
 
-  const brands = await getAccessibleBrands(session.userId, session.role);
+  // Re-check against the DB on every request — a session cookie lasts 30 days, so
+  // without this a deleted or demoted account would keep acting on stale cached
+  // role/identity until the cookie naturally expires.
+  const [dbUser] = await sql<{ role: UserRole }[]>`select role from users where id = ${session.userId}`;
+  if (!dbUser) {
+    session.destroy();
+    redirect("/login");
+  }
+  if (dbUser.role !== session.role) {
+    session.role = dbUser.role;
+    await session.save();
+  }
+  const role = dbUser.role;
+
+  const brands = await getAccessibleBrands(session.userId, role);
   const activeBrand = brands.find((b) => b.id === session.activeBrandId);
 
   return (
@@ -22,7 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <AppSidebar
           companyName={activeBrand?.company_name}
           brandName={activeBrand?.name}
-          isSuperAdmin={session.role === "super_admin"}
+          isSuperAdmin={role === "super_admin"}
         />
         <Backdrop />
         <div className="flex-1 flex flex-col min-w-0">
@@ -50,7 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="card p-12 text-center max-w-lg mx-auto mt-10">
                 <p className="mb-2 text-lg font-semibold">Belum ada brand yang bisa diakses</p>
                 <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  {session.role === "super_admin"
+                  {role === "super_admin"
                     ? "Buat perusahaan & brand dulu lewat Master Data."
                     : "Hubungi Super Admin untuk ditautkan ke sebuah brand."}
                 </p>

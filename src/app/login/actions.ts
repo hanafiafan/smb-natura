@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { getSession, verifyPassword } from "@/lib/session";
+import { getSession, hashPassword, verifyPassword } from "@/lib/session";
 import { isLocked, minutesRemaining, afterFailedAttempt, RESET_STATE } from "@/lib/login-lockout";
 import type { AppUser } from "@/lib/database.types";
 
@@ -12,6 +12,12 @@ const LoginSchema = z.object({
   email: z.email(),
   password: z.string().min(6),
 });
+
+// Fixed-cost hash so a nonexistent-email login still pays the same scrypt work as a real
+// wrong-password attempt — without this, response timing (and the fact that a real email
+// eventually shows a "locked" message that a fake one never does) lets an attacker
+// enumerate which emails have accounts.
+const DUMMY_HASH = hashPassword("timing-parity-placeholder");
 
 export async function login(formData: FormData) {
   const parsed = LoginSchema.safeParse({
@@ -31,7 +37,8 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${msg}&email=${encodeURIComponent(parsed.data.email)}`);
   }
 
-  if (!user || !verifyPassword(parsed.data.password, user.password_hash)) {
+  const passwordValid = verifyPassword(parsed.data.password, user?.password_hash ?? DUMMY_HASH);
+  if (!user || !passwordValid) {
     if (user) {
       const next = afterFailedAttempt(user);
       await sql`update users set failed_attempts = ${next.failed_attempts}, locked_until = ${next.locked_until} where id = ${user.id}`;

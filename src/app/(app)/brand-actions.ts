@@ -15,6 +15,9 @@ export async function switchBrand(formData: FormData) {
       select 1 from user_brands where user_id = ${session.userId} and brand_id = ${brandId}
     `;
     if (!allowed) return;
+  } else {
+    const [exists] = await sql`select 1 from brands where id = ${brandId} and is_active`;
+    if (!exists) return;
   }
 
   session.activeBrandId = brandId;
@@ -23,5 +26,8 @@ export async function switchBrand(formData: FormData) {
 
   const redirectTo = String(formData.get("redirect_to") ?? "/");
   // Only allow same-origin relative paths — never let this become an open redirect.
-  redirect(redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/");
+  // Backslashes are rejected too: browsers treat "/\evil.com" as scheme-relative,
+  // the same bypass "//evil.com" already guards against.
+  const isSafeRedirect = redirectTo.startsWith("/") && !redirectTo.startsWith("//") && !redirectTo.includes("\\");
+  redirect(isSafeRedirect ? redirectTo : "/");
 }
