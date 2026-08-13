@@ -7,8 +7,7 @@ import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL } from "@/lib/pnl";
 import { fmtRp, fmtRpFull, variance } from "@/lib/format";
 import { KpiCard } from "@/components/kpi-card";
-import { PeriodPicker } from "@/components/period-picker";
-import { BrandFilterCard } from "@/components/brand-filter";
+import { FilterBar } from "@/components/filter-bar";
 import { CategoryDonut, ComparisonBar } from "@/components/charts";
 import { RevenueFlow } from "@/components/revenue-flow";
 import { RevenueBreakdown } from "@/components/revenue-breakdown";
@@ -94,8 +93,7 @@ export default async function DashboardPage({
         <Link href="/transactions/new" className="btn"><Sparkles size={16} /> Catat Transaksi</Link>
       </div>
 
-      <BrandFilterCard brands={brands} activeBrandId={brandId} />
-      <PeriodPicker />
+      <FilterBar brands={brands} activeBrandId={brandId} />
 
       {!hasData ? (
         <div className="card p-12 text-center">

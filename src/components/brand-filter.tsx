@@ -5,13 +5,17 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Building2 } from "lucide-react";
 import { switchBrand } from "@/app/(app)/brand-actions";
 import type { AccessibleBrand } from "@/lib/brands";
+import { cn } from "@/lib/utils";
 
 export function BrandFilterCard({
   brands,
   activeBrandId,
+  bare,
 }: {
   brands: AccessibleBrand[];
   activeBrandId?: number;
+  /** Skip the own card/padding wrapper — used when nested inside FilterBar. */
+  bare?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -38,7 +42,7 @@ export function BrandFilterCard({
   const redirectTo = qs ? `${pathname}?${qs}` : pathname;
 
   return (
-    <form action={switchBrand} className="card p-5 no-print">
+    <form action={switchBrand} className={cn("no-print", !bare && "card p-5")}>
       <input type="hidden" name="redirect_to" value={redirectTo} />
       <div className="flex items-center gap-2 mb-4">
         <div className="w-8 h-8 rounded-lg grid place-items-center text-brand-600" style={{ background: "var(--color-brand-50)" }}>

@@ -7,7 +7,7 @@ import { PERIOD_MODES, type PeriodMode } from "@/lib/period";
 import { todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function PeriodPicker() {
+export function PeriodPicker({ bare }: { bare?: boolean } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -35,7 +35,7 @@ export function PeriodPicker() {
   };
 
   return (
-    <div className={cn("card p-5 no-print", pending && "opacity-70")}>
+    <div className={cn("no-print", !bare && "card p-5", pending && "opacity-70")}>
       <div className="flex items-center gap-2 mb-4">
         <div className="w-8 h-8 rounded-lg grid place-items-center text-brand-600" style={{ background: "var(--color-brand-50)" }}>
           <CalendarRange size={16} />

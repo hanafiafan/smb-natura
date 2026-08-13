@@ -5,9 +5,8 @@ import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
-import { PeriodPicker } from "@/components/period-picker";
 import { PrintButton } from "@/components/print-button";
-import { BrandFilterCard } from "@/components/brand-filter";
+import { FilterBar } from "@/components/filter-bar";
 import { computePeriods, type PeriodMode } from "@/lib/period";
 
 export const metadata = { title: "Laporan Laba/Rugi — SMB Natura" };
@@ -109,12 +108,7 @@ export default async function ReportPage({
         </div>
       </div>
 
-      <div className="no-print">
-        <BrandFilterCard brands={brands} activeBrandId={brandId} />
-      </div>
-      <div className="no-print">
-        <PeriodPicker />
-      </div>
+      <FilterBar brands={brands} activeBrandId={brandId} />
 
       {/* Report content — screen + print */}
       <div className="report-sheet card p-8 print:p-0 print:border-0 print:shadow-none">
