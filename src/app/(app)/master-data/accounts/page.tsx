@@ -3,7 +3,9 @@ import { CheckCircle2, XCircle, Pencil, ListTree } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession, requireSuperAdmin } from "@/lib/session";
 import type { Account, AccountSection } from "@/lib/database.types";
+import { categoriesBySection } from "@/lib/account-categories";
 import { DeleteAccountBtn } from "@/components/delete-account-btn";
+import { AccountForm } from "@/components/account-form";
 import { createAccount, toggleAccountActive } from "./actions";
 
 export const metadata = { title: "Akun & Kategori Transaksi — SMB Natura" };
@@ -46,48 +48,16 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         <Link href="/master-data" className="btn-ghost text-sm">← Kembali</Link>
       </div>
 
-      <form action={createAccount} className="card p-5 space-y-4">
+      <div className="card p-5 space-y-4">
         <h2 className="text-sm font-bold flex items-center gap-2"><ListTree size={16} /> Tambah ID / Kategori Baru</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="label" htmlFor="section">Jenis</label>
-            <select id="section" name="section" className="select" defaultValue="opex" required>
-              {Object.entries(SECTION_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="category">Kategori</label>
-            <input id="category" name="category" className="input" placeholder="mis. Sewa (kosongkan untuk buat baru)" />
-          </div>
-          <div>
-            <label className="label" htmlFor="code">Kode</label>
-            <input id="code" name="code" className="input" placeholder="mis. 6820" required />
-          </div>
-          <div>
-            <label className="label" htmlFor="sign">Tipe Nilai</label>
-            <select id="sign" name="sign" className="select" defaultValue="1">
-              <option value="1">Normal (+)</option>
-              <option value="-1">Pengurang (-)</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="label" htmlFor="name">Nama</label>
-            <input id="name" name="name" className="input" placeholder="mis. Beban Sewa Laptop" required />
-          </div>
-        </div>
-        <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-          Untuk Biaya Operasional: isi <b>Kategori</b> dengan nama grup yang sudah ada (mis. &quot;Sewa&quot;) supaya akun baru
-          langsung muncul di grup itu saat Catat Transaksi. Isi nama grup baru untuk membuat kategori baru.
-        </p>
-        {error && (
-          <div className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
-            {decodeURIComponent(error)}
-          </div>
-        )}
-        <button type="submit" className="btn">+ Tambah Akun</button>
-      </form>
+        <AccountForm
+          action={createAccount}
+          sectionLabels={SECTION_LABELS}
+          categoriesBySection={categoriesBySection(accounts)}
+          submitLabel="+ Tambah Akun"
+          error={error ? decodeURIComponent(error) : undefined}
+        />
+      </div>
 
       {accounts.length === 0 ? (
         <p className="text-sm text-center py-6" style={{ color: "var(--muted)" }}>Belum ada akun untuk brand ini.</p>

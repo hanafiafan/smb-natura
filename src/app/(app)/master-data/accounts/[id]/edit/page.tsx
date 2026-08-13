@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getSession, requireSuperAdmin } from "@/lib/session";
 import type { Account } from "@/lib/database.types";
+import { categoriesBySection } from "@/lib/account-categories";
+import { AccountForm } from "@/components/account-form";
 import { SECTION_LABELS } from "../../page";
 import { updateAccount } from "../../actions";
 
@@ -19,8 +21,12 @@ export default async function EditAccountPage({
   const { id } = await params;
   const { error } = await searchParams;
   const session = await getSession();
+  const brandId = session.activeBrandId!;
 
-  const [account] = await sql<Account[]>`select * from accounts where id = ${id} and brand_id = ${session.activeBrandId!}`;
+  const [[account], accounts] = await Promise.all([
+    sql<Account[]>`select * from accounts where id = ${id} and brand_id = ${brandId}`,
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by section, sort_order`,
+  ]);
   if (!account) notFound();
 
   const boundUpdate = updateAccount.bind(null, account.id);
@@ -31,41 +37,16 @@ export default async function EditAccountPage({
         <h1 className="text-xl font-bold">Edit Akun</h1>
         <Link href="/master-data/accounts" className="btn-ghost text-sm">← Kembali</Link>
       </div>
-      <form action={boundUpdate} className="card p-5 space-y-4">
-        <div>
-          <label className="label" htmlFor="section">Jenis</label>
-          <select id="section" name="section" className="select" defaultValue={account.section} required>
-            {Object.entries(SECTION_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="category">Kategori</label>
-          <input id="category" name="category" className="input" defaultValue={account.category ?? ""} />
-        </div>
-        <div>
-          <label className="label" htmlFor="code">Kode</label>
-          <input id="code" name="code" className="input" defaultValue={account.code} required />
-        </div>
-        <div>
-          <label className="label" htmlFor="sign">Tipe Nilai</label>
-          <select id="sign" name="sign" className="select" defaultValue={String(account.sign)}>
-            <option value="1">Normal (+)</option>
-            <option value="-1">Pengurang (-)</option>
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="name">Nama</label>
-          <input id="name" name="name" className="input" defaultValue={account.name} required />
-        </div>
-        {error && (
-          <div className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
-            {decodeURIComponent(error)}
-          </div>
-        )}
-        <button type="submit" className="btn w-full">Simpan Perubahan</button>
-      </form>
+      <div className="card p-5">
+        <AccountForm
+          action={boundUpdate}
+          sectionLabels={SECTION_LABELS}
+          categoriesBySection={categoriesBySection(accounts)}
+          defaultValues={{ section: account.section, category: account.category, code: account.code, name: account.name, sign: account.sign }}
+          submitLabel="Simpan Perubahan"
+          error={error ? decodeURIComponent(error) : undefined}
+        />
+      </div>
     </div>
   );
 }
