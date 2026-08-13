@@ -3,7 +3,7 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
-import { aggregate, buildPnL, type PnLRow } from "@/lib/pnl";
+import { aggregate, buildPnL, relevantAccounts, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import { FilterBar } from "@/components/filter-bar";
@@ -11,9 +11,16 @@ import { computePeriods, type PeriodMode } from "@/lib/period";
 
 export const metadata = { title: "Laporan Laba/Rugi — SMB Natura" };
 
+/** "YYYY-MM-DD" → local Date at midnight, avoiding the UTC-midnight-then-local-format
+ * off-by-one that `new Date(iso)` produces in negative-UTC-offset timezones. */
+function parseISODateLocal(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 /** Format IDR seperti PDF: `2.922.802.315,` atau `674.680.305,47` (Indonesian, trailing comma when integer) */
 function fmtIdrPdf(n: number): string {
-  if (!isFinite(n) || n === 0) return "0,";
+  if (!isFinite(n) || Math.abs(n) < 0.005) return "0,";
   const abs = Math.abs(n);
   const rounded = Math.round(abs);
   const hasCents = Math.abs(abs - rounded) > 0.005;
@@ -25,24 +32,24 @@ function fmtIdrPdf(n: number): string {
 
 /** Format persentase seperti PDF: `100 %`, `-4,86 %`, `5,3 %` */
 function fmtPctPdf(p: number): string {
-  if (!isFinite(p)) return "0 %";
+  if (!isFinite(p) || Math.abs(p) < 0.005) return "0 %";
   const s = p.toLocaleString("id-ID", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   return `${s} %`;
 }
 
 /** Format tanggal untuk header PDF: `01 Apr 2026 - 30 Apr 2026` */
 function fmtDateRangePdf(p: { start: string; end: string }): string {
-  const fmt = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-  };
+  const fmt = (iso: string) => parseISODateLocal(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
   return `${fmt(p.start)} - ${fmt(p.end)}`;
 }
 
-/** Format singkat untuk header kolom: `1 - 30 Apr 2026` */
+/** Format singkat untuk header kolom: `1 - 30 Apr 2026`, atau `1 Apr 2026` untuk rentang satu hari */
 function fmtColHeader(p: { start: string; end: string }): string {
-  const d0 = new Date(p.start);
-  const d1 = new Date(p.end);
+  const d0 = parseISODateLocal(p.start);
+  const d1 = parseISODateLocal(p.end);
+  if (d0.getTime() === d1.getTime()) {
+    return d1.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  }
   const monthYear = d1.toLocaleDateString("id-ID", { month: "short", year: "numeric" });
   if (d0.getMonth() === d1.getMonth() && d0.getFullYear() === d1.getFullYear()) {
     return `${d0.getDate()} - ${d1.getDate()} ${monthYear}`;
@@ -65,8 +72,8 @@ export default async function ReportPage({
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const [accounts, brands, txns] = await Promise.all([
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
+  const [allAccounts, brands, txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
     getAccessibleBrands(session.userId!, session.role!),
     sql<{ account_id: number; txn_date: string; amount: number }[]>`
       select account_id, txn_date, amount from transactions
@@ -76,7 +83,7 @@ export default async function ReportPage({
   const brand = brands.find((b) => b.id === brandId);
 
   const aggs = aggregate(txns, periodA, periodB);
-  const pnl = buildPnL(accounts, aggs);
+  const pnl = buildPnL(relevantAccounts(allAccounts, aggs), aggs);
 
   const omsetA = pnl.totals.netRevenue[0];
   const omsetB = pnl.totals.netRevenue[1];

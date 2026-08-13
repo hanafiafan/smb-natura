@@ -3,7 +3,7 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
-import { aggregate, buildPnL } from "@/lib/pnl";
+import { aggregate, buildPnL, relevantAccounts } from "@/lib/pnl";
 import { fmtRpFull, fmtPct } from "@/lib/format";
 import { KpiCard } from "@/components/kpi-card";
 import { PeriodPicker } from "@/components/period-picker";
@@ -14,6 +14,7 @@ export const metadata = { title: "Semua Brand — SMB Natura" };
 type BrandTotals = {
   brandId: number;
   brandName: string;
+  companyId: number;
   companyName: string;
   netRevenue: [number, number];
   grossProfit: [number, number];
@@ -38,18 +39,19 @@ export default async function AllBrandsPage({
 
   const perBrand: BrandTotals[] = await Promise.all(
     brands.map(async (b): Promise<BrandTotals> => {
-      const [accounts, txns] = await Promise.all([
-        sql<Account[]>`select * from accounts where brand_id = ${b.id} and is_active = true order by sort_order asc`,
+      const [allAccounts, txns] = await Promise.all([
+        sql<Account[]>`select * from accounts where brand_id = ${b.id} order by sort_order asc`,
         sql<{ account_id: number; txn_date: string; amount: number }[]>`
           select account_id, txn_date, amount from transactions
           where brand_id = ${b.id} and txn_date >= ${min} and txn_date <= ${max}
         `,
       ]);
       const aggs = aggregate(txns, periodA, periodB);
-      const { totals } = buildPnL(accounts, aggs);
+      const { totals } = buildPnL(relevantAccounts(allAccounts, aggs), aggs);
       return {
         brandId: b.id,
         brandName: b.name,
+        companyId: b.company_id,
         companyName: b.company_name,
         netRevenue: totals.netRevenue,
         grossProfit: totals.grossProfit,
@@ -66,16 +68,18 @@ export default async function AllBrandsPage({
       opIncome: [acc.opIncome[0] + b.opIncome[0], acc.opIncome[1] + b.opIncome[1]] as [number, number],
       netIncome: [acc.netIncome[0] + b.netIncome[0], acc.netIncome[1] + b.netIncome[1]] as [number, number],
     }),
-    { netRevenue: [0, 0], grossProfit: [0, 0], opIncome: [0, 0], netIncome: [0, 0] } as Omit<BrandTotals, "brandId" | "brandName" | "companyName">,
+    { netRevenue: [0, 0], grossProfit: [0, 0], opIncome: [0, 0], netIncome: [0, 0] } as Omit<BrandTotals, "brandId" | "brandName" | "companyId" | "companyName">,
   );
 
   const grossMarginB = grand.netRevenue[1] > 0 ? (grand.grossProfit[1] / grand.netRevenue[1]) * 100 : 0;
   const opMarginB = grand.netRevenue[1] > 0 ? (grand.opIncome[1] / grand.netRevenue[1]) * 100 : 0;
   const netMarginB = grand.netRevenue[1] > 0 ? (grand.netIncome[1] / grand.netRevenue[1]) * 100 : 0;
 
-  const companies = new Map<string, BrandTotals[]>();
+  const companies = new Map<number, { name: string; brands: BrandTotals[] }>();
   for (const b of perBrand) {
-    companies.set(b.companyName, [...(companies.get(b.companyName) ?? []), b]);
+    const entry = companies.get(b.companyId) ?? { name: b.companyName, brands: [] };
+    entry.brands.push(b);
+    companies.set(b.companyId, entry);
   }
   const sortedBrands = [...perBrand].sort((a, b) => b.netIncome[1] - a.netIncome[1]);
 
@@ -175,12 +179,12 @@ export default async function AllBrandsPage({
               <tr><th className="text-left">Perusahaan</th><th>Omset ({labelB})</th><th>Laba Bersih ({labelB})</th></tr>
             </thead>
             <tbody>
-              {[...companies.entries()].map(([companyName, list]) => {
+              {[...companies.entries()].map(([companyId, { name, brands: list }]) => {
                 const omset = list.reduce((s, b) => s + b.netRevenue[1], 0);
                 const laba = list.reduce((s, b) => s + b.netIncome[1], 0);
                 return (
-                  <tr key={companyName} className="item">
-                    <td style={{ paddingLeft: 12 }}>{companyName}</td>
+                  <tr key={companyId} className="item">
+                    <td style={{ paddingLeft: 12 }}>{name}</td>
                     <td className="font-mono">{fmtRpFull(omset)}</td>
                     <td className="font-mono">{fmtRpFull(laba)}</td>
                   </tr>

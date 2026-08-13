@@ -5,6 +5,8 @@ export function ExecutiveSummary({
   omsetA, omsetB,
   netA, netB,
   netMarginB,
+  hasRevenue,
+  hasPriorPeriodData,
   biggestExpense,
   biggestUp,
   marketingPct,
@@ -14,6 +16,10 @@ export function ExecutiveSummary({
   omsetA: number; omsetB: number;
   netA: number; netB: number;
   netMarginB: number;
+  /** false when this period had zero net revenue — margin % is meaningless then. */
+  hasRevenue: boolean;
+  /** false when the comparison period had no transactions at all (e.g. brand's first period). */
+  hasPriorPeriodData: boolean;
   biggestExpense: { label: string; b: number } | null;
   biggestUp: { label: string; a: number; b: number } | null;
   marketingPct: number;
@@ -22,10 +28,14 @@ export function ExecutiveSummary({
 }) {
   const omsetDelta = variance(omsetA, omsetB);
   const netDelta = variance(netA, netB);
+  const netSignFlipped = hasPriorPeriodData && netA !== 0 && netB !== 0 && Math.sign(netA) !== Math.sign(netB);
 
-  const trendWord = netDelta >= 5 ? "naik" : netDelta <= -5 ? "turun" : "relatif stabil";
-  const TrendIcon = netDelta >= 5 ? TrendingUp : netDelta <= -5 ? TrendingDown : Minus;
-  const trendColor = netDelta >= 5 ? "var(--pos)" : netDelta <= -5 ? "var(--neg)" : "var(--muted-fg)";
+  const trendWord = netSignFlipped ? (netB >= 0 ? "berbalik jadi untung" : "berbalik jadi rugi")
+    : netDelta >= 5 ? "naik" : netDelta <= -5 ? "turun" : "relatif stabil";
+  const TrendIcon = netSignFlipped ? (netB >= 0 ? TrendingUp : TrendingDown)
+    : netDelta >= 5 ? TrendingUp : netDelta <= -5 ? TrendingDown : Minus;
+  const trendColor = netSignFlipped ? (netB >= 0 ? "var(--pos)" : "var(--neg)")
+    : netDelta >= 5 ? "var(--pos)" : netDelta <= -5 ? "var(--neg)" : "var(--muted-fg)";
 
   const insights: string[] = [];
   if (Math.abs(omsetDelta) >= 3) {
@@ -46,16 +56,18 @@ export function ExecutiveSummary({
     insights.push(`Belanja iklan mencapai ${marketingPct.toFixed(0)}% dari omset — pastikan konversi sepadan.`);
   }
 
-  const healthMsg =
-    netMarginB >= 15 ? `Margin laba bersih ${netMarginB.toFixed(1)}% — bisnis sehat.` :
-    netMarginB >= 5 ? `Margin laba bersih ${netMarginB.toFixed(1)}% — cukup, masih bisa dioptimalkan.` :
-    netMarginB >= 0 ? `Margin laba bersih tipis (${netMarginB.toFixed(1)}%) — waspada terhadap biaya.` :
-    `Bisnis rugi ${Math.abs(netMarginB).toFixed(1)}% dari omset periode ini — perlu tindakan cepat.`;
+  const healthMsg = !hasRevenue
+    ? (netB < 0 ? `Tidak ada omset periode ini — seluruh biaya (${fmtRp(Math.abs(netB))}) langsung jadi rugi.` : `Belum ada omset maupun transaksi periode ini.`)
+    : netMarginB >= 15 ? `Margin laba bersih ${netMarginB.toFixed(1)}% — bisnis sehat.`
+    : netMarginB >= 5 ? `Margin laba bersih ${netMarginB.toFixed(1)}% — cukup, masih bisa dioptimalkan.`
+    : netMarginB >= 0 ? `Margin laba bersih tipis (${netMarginB.toFixed(1)}%) — waspada terhadap biaya.`
+    : `Bisnis rugi ${Math.abs(netMarginB).toFixed(1)}% dari omset periode ini — perlu tindakan cepat.`;
 
-  const healthColor =
-    netMarginB >= 5 ? "var(--pos)" :
-    netMarginB >= 0 ? "var(--expense)" :
-    "var(--neg)";
+  const healthColor = !hasRevenue
+    ? (netB < 0 ? "var(--neg)" : "var(--muted-fg)")
+    : netMarginB >= 5 ? "var(--pos)"
+    : netMarginB >= 0 ? "var(--expense)"
+    : "var(--neg)";
 
   return (
     <div className="card p-6 relative overflow-hidden"
@@ -81,10 +93,18 @@ export function ExecutiveSummary({
           <p className="text-[15px] mb-3 leading-relaxed text-gray-800 flex items-baseline gap-2 flex-wrap">
             <TrendIcon size={18} strokeWidth={2.5} className="translate-y-0.5 shrink-0" style={{ color: trendColor }} />
             <span>
-              Laba bersih Anda <b>{trendWord}</b>
-              {netDelta !== 0 && <> {Math.abs(netDelta).toFixed(1)}% ke <b style={{ color: netB >= 0 ? "var(--profit)" : "var(--neg)" }}>{fmtRp(netB)}</b></>}
-              {netDelta === 0 && <> di <b>{fmtRp(netB)}</b></>}
-              {" "}dibanding {periodALabel} ({fmtRp(netA)}).
+              {!hasPriorPeriodData ? (
+                <>Laba bersih periode ini <b>{fmtRp(netB)}</b> — belum ada data {periodALabel} untuk dibandingkan.</>
+              ) : netSignFlipped ? (
+                <>Laba bersih Anda <b>{trendWord}</b>, dari {fmtRp(netA)} ({periodALabel}) ke <b style={{ color: netB >= 0 ? "var(--profit)" : "var(--neg)" }}>{fmtRp(netB)}</b> ({periodBLabel}).</>
+              ) : (
+                <>
+                  Laba bersih Anda <b>{trendWord}</b>
+                  {netDelta !== 0 && <> {Math.abs(netDelta).toFixed(1)}% ke <b style={{ color: netB >= 0 ? "var(--profit)" : "var(--neg)" }}>{fmtRp(netB)}</b></>}
+                  {netDelta === 0 && <> di <b>{fmtRp(netB)}</b></>}
+                  {" "}dibanding {periodALabel} ({fmtRp(netA)}).
+                </>
+              )}
             </span>
           </p>
           <ul className="space-y-2 text-sm" style={{ color: "var(--muted-fg)" }}>

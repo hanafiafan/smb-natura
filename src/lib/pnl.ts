@@ -25,6 +25,15 @@ export type PnLResult = {
   };
 };
 
+/** Accounts to feed into buildPnL: keep every active account (even with no activity
+ * this period) plus any inactive account that actually has aggregated activity — so
+ * deactivating an account doesn't retroactively shrink past periods' totals, while
+ * still keeping reports free of long-dead accounts that never touched this period. */
+export function relevantAccounts(accounts: Account[], aggs: AccountAgg[]): Account[] {
+  const activeAggIds = new Set(aggs.map((g) => g.account_id));
+  return accounts.filter((a) => a.is_active || activeAggIds.has(a.id));
+}
+
 function sectionSum(
   accounts: Account[],
   aggMap: Map<number, AccountAgg>,

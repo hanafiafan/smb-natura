@@ -68,10 +68,10 @@ export function RevenueFlow({
               key={s.label}
               className="relative flex items-center justify-center text-xs font-semibold transition-all hover:brightness-95"
               style={{ width: `${width}%`, background: s.color, color: "white", minWidth: 4 }}
-              title={`${s.label}: ${fmtRp(s.value)} (${((s.value / omset) * 100).toFixed(1)}% dari omset)`}
+              title={`${s.label}: ${fmtRp(s.value)} (${omset > 0 ? ((s.value / omset) * 100).toFixed(1) : "0"}% dari omset)`}
             >
               {width > 6 && (
-                <span className="truncate px-2">{Math.round((s.value / omset) * 100)}%</span>
+                <span className="truncate px-2">{omset > 0 ? Math.round((s.value / omset) * 100) : 0}%</span>
               )}
             </div>
           );

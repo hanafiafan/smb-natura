@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
-import { aggregate, buildPnL } from "@/lib/pnl";
+import { aggregate, buildPnL, relevantAccounts } from "@/lib/pnl";
 import { fmtRp, fmtRpFull, variance } from "@/lib/format";
 import { KpiCard } from "@/components/kpi-card";
 import { FilterBar } from "@/components/filter-bar";
@@ -32,8 +32,8 @@ export default async function DashboardPage({
   const session = await getSession();
   const brandId = session.activeBrandId!;
 
-  const [accounts, txns, brands] = await Promise.all([
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
+  const [allAccounts, txns, brands] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
     sql<{ account_id: number; txn_date: string; amount: number }[]>`
       select account_id, txn_date, amount from transactions
       where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
@@ -43,6 +43,7 @@ export default async function DashboardPage({
   const activeBrand = brands.find((b) => b.id === brandId);
 
   const aggs = aggregate(txns, periodA, periodB);
+  const accounts = relevantAccounts(allAccounts, aggs);
   const pnl = buildPnL(accounts, aggs);
   const { totals } = pnl;
 
@@ -79,7 +80,8 @@ export default async function DashboardPage({
   const returB = Math.abs(returRow?.b ?? 0);
   const diskonB = Math.abs(diskonRow?.b ?? 0);
 
-  const hasData = totals.netRevenue[1] !== 0 || totals.opex[1] !== 0;
+  const hasData = aggs.length > 0;
+  const hasPriorPeriodData = aggs.some((g) => g.a !== 0);
 
   return (
     <div className="space-y-6">
@@ -113,6 +115,8 @@ export default async function DashboardPage({
             omsetA={totals.netRevenue[0]} omsetB={totals.netRevenue[1]}
             netA={totals.netIncome[0]} netB={totals.netIncome[1]}
             netMarginB={netMarginB}
+            hasRevenue={totals.netRevenue[1] > 0}
+            hasPriorPeriodData={hasPriorPeriodData}
             biggestExpense={biggest ? { label: biggest.label, b: biggest.b } : null}
             biggestUp={biggestUp ? { label: biggestUp.label, a: biggestUp.a, b: biggestUp.b } : null}
             marketingPct={marketingPct}
@@ -203,7 +207,7 @@ export default async function DashboardPage({
                   tone="neutral" icon={<Star size={16} />}
                   title="Beban terbesar bulan ini"
                   name={biggest.label}
-                  body={`${fmtRpFull(biggest.b)} · ${(biggest.b / (totals.netRevenue[1] || 1) * 100).toFixed(1)}% dari omset`}
+                  body={`${fmtRpFull(biggest.b)}${totals.netRevenue[1] > 0 ? ` · ${((biggest.b / totals.netRevenue[1]) * 100).toFixed(1)}% dari omset` : ""}`}
                 />
               )}
               {biggestUp && biggestUp.b > biggestUp.a && (
