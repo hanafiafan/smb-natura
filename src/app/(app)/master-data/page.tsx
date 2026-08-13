@@ -4,7 +4,8 @@ import { sql } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/session";
 import { DeleteBrandBtn } from "@/components/delete-brand-btn";
 import { DeleteCompanyBtn } from "@/components/delete-company-btn";
-import { toggleBrandActive, deleteUser } from "./actions";
+import { DeleteUserBtn } from "@/components/delete-user-btn";
+import { toggleBrandActive } from "./actions";
 
 export const metadata = { title: "Master Data — SMB Natura" };
 
@@ -21,8 +22,9 @@ type UserRow = {
   brand_names: string[];
 };
 
-export default async function MasterDataPage() {
+export default async function MasterDataPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   await requireSuperAdmin();
+  const { error } = await searchParams;
 
   const [companyRows, userRows] = await Promise.all([
     sql<{ id: number; name: string; brand_id: number | null; brand_name: string | null; brand_active: boolean | null }[]>`
@@ -68,6 +70,12 @@ export default async function MasterDataPage() {
           Kelola perusahaan, brand, dan akun pengguna.
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
+          {decodeURIComponent(error)}
+        </div>
+      )}
 
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
@@ -152,9 +160,7 @@ export default async function MasterDataPage() {
                   <td>
                     <div className="flex gap-3 justify-end">
                       <Link href={`/master-data/users/${u.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
-                      <form action={deleteUser.bind(null, u.id)}>
-                        <button type="submit" className="text-xs" style={{ color: "var(--neg)" }}>Hapus</button>
-                      </form>
+                      <DeleteUserBtn id={u.id} email={u.email} />
                     </div>
                   </td>
                 </tr>

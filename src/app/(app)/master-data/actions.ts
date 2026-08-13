@@ -90,10 +90,18 @@ export async function deleteBrand(brandId: number) {
 }
 
 // companies.brands is ON DELETE RESTRICT — the UI only shows this action once a
-// company has zero brands left, so this should always succeed.
+// company has zero brands left, so this should always succeed; the try/catch is just
+// a safety net against a race (a brand added in another tab between page load and click).
 export async function deleteCompany(companyId: number) {
   await requireSuperAdmin();
-  await sql`delete from companies where id = ${companyId}`;
+  try {
+    await sql`delete from companies where id = ${companyId}`;
+  } catch (err) {
+    if ((err as { code?: string }).code === "23503") {
+      fail("/master-data", "Perusahaan ini masih punya brand — hapus brand-nya dulu.");
+    }
+    throw err;
+  }
   revalidatePath("/master-data");
 }
 
@@ -126,8 +134,9 @@ export async function createUser(formData: FormData) {
       returning id
     `;
     userId = user.id;
-  } catch {
-    fail("/master-data/users/new", "Email sudah dipakai akun lain.");
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") fail("/master-data/users/new", "Email sudah dipakai akun lain.");
+    fail("/master-data/users/new", "Gagal membuat pengguna. Coba lagi.");
   }
 
   if (parsed.data.role === "brand_admin" && parsed.data.brand_ids?.length) {
@@ -147,6 +156,15 @@ const UserUpdateSchema = z.object({
   brand_ids: z.array(z.coerce.number().int()).optional(),
 });
 
+// Below this many, refuse to demote/delete a super_admin so the tenant never ends up
+// with zero accounts able to reach Master Data.
+const MIN_SUPER_ADMINS = 1;
+
+async function superAdminCount(): Promise<number> {
+  const [{ count }] = await sql<{ count: number }[]>`select count(*)::int as count from users where role = 'super_admin'`;
+  return count;
+}
+
 export async function updateUser(id: string, formData: FormData) {
   await requireSuperAdmin();
   const parsed = UserUpdateSchema.safeParse({
@@ -160,6 +178,11 @@ export async function updateUser(id: string, formData: FormData) {
     fail(`/master-data/users/${id}/edit`, "Pilih minimal 1 brand untuk Admin Brand.");
   }
 
+  const [current] = await sql<{ role: string }[]>`select role from users where id = ${id}`;
+  if (current?.role === "super_admin" && parsed.data.role !== "super_admin" && (await superAdminCount()) <= MIN_SUPER_ADMINS) {
+    fail(`/master-data/users/${id}/edit`, "Tidak bisa menurunkan role Super Admin terakhir.");
+  }
+
   try {
     if (parsed.data.password) {
       const passwordHash = hashPassword(parsed.data.password);
@@ -167,8 +190,9 @@ export async function updateUser(id: string, formData: FormData) {
     } else {
       await sql`update users set email = ${parsed.data.email}, role = ${parsed.data.role} where id = ${id}`;
     }
-  } catch {
-    fail(`/master-data/users/${id}/edit`, "Email sudah dipakai akun lain.");
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") fail(`/master-data/users/${id}/edit`, "Email sudah dipakai akun lain.");
+    fail(`/master-data/users/${id}/edit`, "Gagal menyimpan perubahan. Coba lagi.");
   }
 
   await sql`delete from user_brands where user_id = ${id}`;
@@ -183,7 +207,14 @@ export async function updateUser(id: string, formData: FormData) {
 }
 
 export async function deleteUser(userId: string) {
-  await requireSuperAdmin();
+  const session = await requireSuperAdmin();
+  if (userId === session.userId) fail("/master-data", "Tidak bisa menghapus akun Anda sendiri.");
+
+  const [target] = await sql<{ role: string }[]>`select role from users where id = ${userId}`;
+  if (target?.role === "super_admin" && (await superAdminCount()) <= MIN_SUPER_ADMINS) {
+    fail("/master-data", "Tidak bisa menghapus Super Admin terakhir.");
+  }
+
   await sql`delete from users where id = ${userId}`;
   revalidatePath("/master-data");
 }

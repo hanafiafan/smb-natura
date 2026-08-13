@@ -33,13 +33,28 @@ function readForm(formData: FormData) {
   });
 }
 
+/** Snaps a "new category" typed by hand to an existing one for this section if it only
+ * differs by case/whitespace — the picker in AccountForm already avoids this client-side,
+ * but a direct/tampered submission could still bypass it, silently forking the grouping
+ * used in Catat Transaksi (e.g. "Sewa" vs "sewa "). */
+async function canonicalCategory(brandId: number, section: string, category: string | null): Promise<string | null> {
+  if (!category) return null;
+  const [existing] = await sql<{ category: string }[]>`
+    select distinct category from accounts
+    where brand_id = ${brandId} and section = ${section} and category is not null and lower(category) = lower(${category})
+    limit 1
+  `;
+  return existing?.category ?? category;
+}
+
 export async function createAccount(formData: FormData) {
   await requireSuperAdmin();
   const session = await getSession();
   const brandId = session.activeBrandId!;
   const parsed = readForm(formData);
   if (!parsed.success) fail("/master-data/accounts", parsed.error.issues[0].message);
-  const { section, category, code, name, sign } = parsed.data;
+  const { section, code, name, sign } = parsed.data;
+  const category = await canonicalCategory(brandId, section, parsed.data.category);
 
   try {
     const [{ max }] = await sql<{ max: number | null }[]>`
@@ -64,7 +79,8 @@ export async function updateAccount(id: number, formData: FormData) {
   const brandId = session.activeBrandId!;
   const parsed = readForm(formData);
   if (!parsed.success) fail(`/master-data/accounts/${id}/edit`, parsed.error.issues[0].message);
-  const { section, category, code, name, sign } = parsed.data;
+  const { section, code, name, sign } = parsed.data;
+  const category = await canonicalCategory(brandId, section, parsed.data.category);
 
   try {
     await sql`

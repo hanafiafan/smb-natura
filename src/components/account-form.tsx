@@ -38,7 +38,11 @@ export function AccountForm({
   );
   const [newCategory, setNewCategory] = useState<string>(startsAsNew ? defaultValues!.category! : "");
 
-  const resolvedCategory = categoryChoice === NEW_CATEGORY ? newCategory.trim() : categoryChoice;
+  // Snap a hand-typed "new" category to an existing one if it only differs by case or
+  // whitespace, so "Sewa" and "sewa " can't silently fork into two separate groups.
+  const newCategoryTrimmed = newCategory.trim();
+  const matchingExisting = existingCategories.find((c) => c.toLowerCase() === newCategoryTrimmed.toLowerCase());
+  const resolvedCategory = categoryChoice === NEW_CATEGORY ? (matchingExisting ?? newCategoryTrimmed) : categoryChoice;
 
   return (
     <form action={action} className="space-y-4">
