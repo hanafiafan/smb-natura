@@ -5,25 +5,26 @@ import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { buildPnL, type PnLRow } from "@/lib/pnl";
-import { fmtRpFull, firstOfMonth, lastOfMonth } from "@/lib/format";
+import { fmtRpFull, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
 import { saveBudgetTargets } from "./actions";
 import { BrandFilterCard } from "@/components/brand-filter";
 
 export const metadata = { title: "Anggaran — SMB Natura" };
 
 function achievementPct(target: number, actual: number): string {
-  if (target === 0) return actual === 0 ? "0%" : "—";
-  return `${((actual / target) * 100).toFixed(1)}%`;
+  if (target === 0) return actual === 0 ? "0%" : "Di luar anggaran";
+  const pct = (actual / target) * 100;
+  return `${(pct || 0).toFixed(1)}%`; // `|| 0` folds a -0 artifact back to 0
 }
 
 export default async function AnggaranPage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string; end?: string; ok?: string }>;
+  searchParams: Promise<{ start?: string; end?: string; ok?: string; error?: string }>;
 }) {
   const sp = await searchParams;
-  const start = sp.start ?? firstOfMonth();
-  const end = sp.end ?? lastOfMonth();
+  const start = safeISODate(sp.start, firstOfMonth());
+  const end = safeISODate(sp.end, lastOfMonth());
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
@@ -64,6 +65,12 @@ export default async function AnggaranPage({
           style={{ color: "var(--pos)", background: "var(--pos-soft)", border: "1px solid var(--color-brand-100)" }}>
           <CheckCircle2 size={16} />
           <span>Target berhasil disimpan.</span>
+        </div>
+      )}
+
+      {sp.error && (
+        <div className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
+          {decodeURIComponent(sp.error)}
         </div>
       )}
 

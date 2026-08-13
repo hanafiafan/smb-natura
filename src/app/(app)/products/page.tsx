@@ -53,7 +53,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       <div className="card overflow-x-auto">
         {products.length === 0 ? (
-          <div className="p-10 text-center" style={{ color: "var(--muted)" }}>Belum ada produk.</div>
+          <div className="p-10 text-center" style={{ color: "var(--muted)" }}>
+            {q ? "Tidak ada produk yang cocok dengan pencarian." : "Belum ada produk."}
+          </div>
         ) : (
           <table className="pnl-table">
             <thead>
