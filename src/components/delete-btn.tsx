@@ -13,7 +13,13 @@ export function DeleteBtn({ id }: { id: string }) {
       disabled={pending}
       onClick={() => {
         if (!confirm("Hapus transaksi ini? Aksi tidak bisa dibatalkan.")) return;
-        start(async () => { await deleteTransaction(id); });
+        start(async () => {
+          try {
+            await deleteTransaction(id);
+          } catch {
+            alert("Gagal menghapus transaksi. Coba lagi.");
+          }
+        });
       }}
     >
       {pending ? "Menghapus…" : "Hapus"}

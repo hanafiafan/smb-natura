@@ -2,8 +2,8 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { queryTransactions } from "@/lib/transactions-query";
 import type { Account } from "@/lib/database.types";
-import { toCsv, csvResponse } from "@/lib/csv";
-import { fmtDate, firstOfMonth, lastOfMonth } from "@/lib/format";
+import { toCsv, csvResponse, csvText } from "@/lib/csv";
+import { fmtDate, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -12,21 +12,21 @@ export async function GET(request: Request) {
   if (!brandId) return new Response("No active brand", { status: 400 });
 
   const sp = Object.fromEntries(new URL(request.url).searchParams);
-  const start = sp.start ?? firstOfMonth();
-  const end = sp.end ?? lastOfMonth();
+  const start = safeISODate(sp.start, firstOfMonth());
+  const end = safeISODate(sp.end, lastOfMonth());
 
-  const accounts = await sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true`;
+  const accounts = await sql<Account[]>`select * from accounts where brand_id = ${brandId}`;
   const { rows: txns } = await queryTransactions(brandId, { ...sp, start, end }, accounts);
 
   const rows: (string | number)[][] = [
     ["Tanggal", "Kode Akun", "Akun", "Kategori", "Keterangan", "Referensi", "Jumlah"],
     ...txns.map((t) => [
       fmtDate(t.txn_date),
-      t.accounts?.code ?? "",
-      t.accounts?.name ?? "",
-      t.accounts?.category ?? "",
-      t.description ?? "",
-      t.reference ?? "",
+      csvText(t.accounts?.code),
+      csvText(t.accounts?.name),
+      csvText(t.accounts?.category),
+      csvText(t.description),
+      csvText(t.reference),
       Math.round(Number(t.amount)),
     ]),
   ];

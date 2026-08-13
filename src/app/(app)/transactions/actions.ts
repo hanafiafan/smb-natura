@@ -9,7 +9,7 @@ import { getSession } from "@/lib/session";
 const TxnSchema = z.object({
   txn_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
   account_id: z.coerce.number().int().positive("Pilih akun"),
-  amount: z.coerce.number().finite().nonnegative("Jumlah harus >= 0"),
+  amount: z.coerce.number().finite().positive("Jumlah harus lebih dari 0"),
   description: z.string().max(500).optional().transform((v) => v?.trim() || null),
   reference: z.string().max(100).optional().transform((v) => v?.trim() || null),
 });
@@ -32,8 +32,12 @@ async function parseAndPack(formData: FormData) {
   return { error: null, fieldErrors: null, data: parsed.data };
 }
 
-async function accountBelongsToBrand(accountId: number, brandId: number): Promise<boolean> {
-  const [account] = await sql<{ id: number }[]>`select id from accounts where id = ${accountId} and brand_id = ${brandId}`;
+/** requireActive=false lets an update keep a transaction's existing (now-deactivated)
+ * account — only a genuinely new account choice must still be active. */
+async function accountBelongsToBrand(accountId: number, brandId: number, requireActive: boolean): Promise<boolean> {
+  const [account] = await sql<{ id: number }[]>`
+    select id from accounts where id = ${accountId} and brand_id = ${brandId} ${requireActive ? sql`and is_active` : sql``}
+  `;
   return !!account;
 }
 
@@ -43,11 +47,17 @@ export async function createTransaction(_prev: ActionState, formData: FormData):
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
-  if (!(await accountBelongsToBrand(data.account_id, brandId))) return { error: "Akun tidak ditemukan di brand ini." };
+  if (!(await accountBelongsToBrand(data.account_id, brandId, true))) {
+    return { error: "Akun tidak ditemukan atau sudah nonaktif di brand ini." };
+  }
 
-  await sql`
-    insert into transactions ${sql({ ...data, brand_id: brandId }, "brand_id", "txn_date", "account_id", "amount", "description", "reference")}
-  `;
+  try {
+    await sql`
+      insert into transactions ${sql({ ...data, brand_id: brandId }, "brand_id", "txn_date", "account_id", "amount", "description", "reference")}
+    `;
+  } catch {
+    return { error: "Gagal menyimpan transaksi. Coba lagi." };
+  }
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");
@@ -60,12 +70,25 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
-  if (!(await accountBelongsToBrand(data.account_id, brandId))) return { error: "Akun tidak ditemukan di brand ini." };
 
-  await sql`
-    update transactions set ${sql(data, "txn_date", "account_id", "amount", "description", "reference")}
-    where id = ${id} and brand_id = ${brandId}
+  const [existing] = await sql<{ account_id: number }[]>`
+    select account_id from transactions where id = ${id} and brand_id = ${brandId}
   `;
+  if (!existing) return { error: "Transaksi tidak ditemukan." };
+
+  const requireActive = data.account_id !== existing.account_id;
+  if (!(await accountBelongsToBrand(data.account_id, brandId, requireActive))) {
+    return { error: "Akun tidak ditemukan atau sudah nonaktif di brand ini." };
+  }
+
+  try {
+    await sql`
+      update transactions set ${sql(data, "txn_date", "account_id", "amount", "description", "reference")}
+      where id = ${id} and brand_id = ${brandId}
+    `;
+  } catch {
+    return { error: "Gagal menyimpan perubahan. Coba lagi." };
+  }
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");

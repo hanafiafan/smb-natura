@@ -1,3 +1,5 @@
+import { safeISODate } from "@/lib/format";
+
 export type PeriodMode = "daily" | "weekly" | "monthly" | "yearly" | "custom";
 
 export const PERIOD_MODES: { key: PeriodMode; label: string }[] = [
@@ -90,8 +92,8 @@ export function computePeriods(
   }
 
   if (mode === "custom") {
-    const startB = customStart ?? iso(t);
-    const endB = customEnd ?? iso(t);
+    const startB = safeISODate(customStart, iso(t));
+    const endB = safeISODate(customEnd, iso(t));
     const dB0 = new Date(startB);
     const dB1 = new Date(endB);
     const days = Math.max(1, Math.round((dB1.getTime() - dB0.getTime()) / 86_400_000) + 1);

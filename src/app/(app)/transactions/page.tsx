@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
-import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth } from "@/lib/format";
+import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
 import { DeleteBtn } from "@/components/delete-btn";
 import { queryTransactions } from "@/lib/transactions-query";
 import { BrandFilterCard } from "@/components/brand-filter";
@@ -21,8 +21,8 @@ type SP = {
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const start = sp.start ?? firstOfMonth();
-  const end = sp.end ?? lastOfMonth();
+  const start = safeISODate(sp.start, firstOfMonth());
+  const end = safeISODate(sp.end, lastOfMonth());
   const page = Math.max(1, Number(sp.page ?? "1"));
   const from = (page - 1) * PAGE_SIZE;
 
@@ -30,7 +30,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const brandId = session.activeBrandId!;
 
   const [accounts, brands] = await Promise.all([
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order`,
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order`,
     getAccessibleBrands(session.userId!, session.role!),
   ]);
 
@@ -126,7 +126,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <label className="label" htmlFor="account_id">Akun</label>
           <select id="account_id" name="account_id" defaultValue={sp.account_id ?? ""} className="select" style={{ minWidth: 220 }}>
             <option value="">Semua Akun</option>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} — {a.name}{!a.is_active ? " (nonaktif)" : ""}</option>)}
           </select>
         </div>
         <div className="flex-1 min-w-[180px]">

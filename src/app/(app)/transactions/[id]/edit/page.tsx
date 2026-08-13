@@ -15,7 +15,7 @@ export default async function EditTransactionPage({ params }: { params: Promise<
 
   const [[txn], accounts] = await Promise.all([
     sql<Transaction[]>`select * from transactions where id = ${id} and brand_id = ${brandId}`,
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order`,
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order`,
   ]);
   if (!txn) notFound();
 

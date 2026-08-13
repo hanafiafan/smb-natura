@@ -28,6 +28,17 @@ export function variance(a: number, b: number): number {
   return ((b - a) / Math.abs(a)) * 100;
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Guards a `date`-column query param: a malformed value (bad shape, non-existent date
+ * like "2026-02-30") would otherwise reach Postgres as a raw string and throw an
+ * unhandled "invalid input syntax for type date" 500, or land unsanitized in a CSV
+ * export filename. Falls back silently instead of erroring the whole page/export. */
+export function safeISODate(value: string | undefined | null, fallback: string): string {
+  if (value && ISO_DATE_RE.test(value) && !isNaN(new Date(value).getTime())) return value;
+  return fallback;
+}
+
 export function fmtDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });

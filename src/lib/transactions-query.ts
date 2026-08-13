@@ -22,7 +22,8 @@ export async function queryTransactions(
     sql`t.txn_date <= ${filters.end}`,
   ];
 
-  if (filters.account_id) conditions.push(sql`t.account_id = ${Number(filters.account_id)}`);
+  const accountId = filters.account_id ? Number(filters.account_id) : null;
+  if (accountId != null && Number.isFinite(accountId)) conditions.push(sql`t.account_id = ${accountId}`);
 
   const q = filters.q?.trim();
   if (q) conditions.push(sql`(t.description ilike ${"%" + q + "%"} or t.reference ilike ${"%" + q + "%"})`);

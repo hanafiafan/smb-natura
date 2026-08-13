@@ -103,13 +103,15 @@ export function TxnForm({
   const accountsInGroup = useMemo(() => {
     if (!group) return [];
     return accounts.filter((a) => {
-      if (!a.is_active) return false;
+      // Keep the transaction's already-assigned account selectable even if it's been
+      // deactivated since — only block picking a *different* inactive account.
+      if (!a.is_active && a.id !== txn?.account_id) return false;
       // Filter by flow first
       if (flow === "in" && !isIncomeSection(a)) return false;
       if (flow === "out" && isIncomeSection(a)) return false;
       return accountGroup(a) === group;
     });
-  }, [accounts, group, flow]);
+  }, [accounts, group, flow, txn?.account_id]);
 
   const selectedAccount = accounts.find((a) => a.id === accountId) || null;
   const amountNum = Number(amountRaw.replace(/\D/g, "")) || 0;
@@ -201,7 +203,7 @@ export function TxnForm({
                 >
                   <div className="min-w-0">
                     <div className={cn("text-[13px] font-medium truncate", active ? "text-brand-700" : "text-gray-800")}>
-                      {a.name}
+                      {a.name}{!a.is_active && <span className="text-gray-400"> (nonaktif)</span>}
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono">{a.code}</div>
                   </div>
