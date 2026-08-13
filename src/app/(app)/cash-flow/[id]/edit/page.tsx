@@ -17,10 +17,14 @@ export default async function EditCashFlowPage({ params }: { params: Promise<{ i
       select * from cash_flow_entries where id = ${id} and brand_id = ${session.activeBrandId!}
     `,
     sql<CashAccount[]>`
-      select * from cash_accounts where brand_id = ${session.activeBrandId!} and is_active order by name
+      select * from cash_accounts where brand_id = ${session.activeBrandId!} order by name
     `,
   ]);
   if (!entry) notFound();
+  // Keep the entry's already-assigned account selectable even if it's been deactivated
+  // since — a native <select> silently falls back to the first option (and loses the
+  // real value on save) if the current value isn't among the rendered options.
+  const selectableAccounts = accounts.filter((a) => a.is_active || a.id === entry.account_id);
 
   const boundUpdate = updateCashFlowEntry.bind(null, id) as (s: ActionState, fd: FormData) => Promise<ActionState>;
 
@@ -33,7 +37,7 @@ export default async function EditCashFlowPage({ params }: { params: Promise<{ i
         </div>
         <Link href="/cash-flow" className="btn-ghost text-sm">← Kembali</Link>
       </div>
-      <CashFlowForm action={boundUpdate} entry={entry} accounts={accounts} submitLabel="Simpan Perubahan" />
+      <CashFlowForm action={boundUpdate} entry={entry} accounts={selectableAccounts} submitLabel="Simpan Perubahan" />
     </div>
   );
 }

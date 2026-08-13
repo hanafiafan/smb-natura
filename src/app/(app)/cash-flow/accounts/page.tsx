@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Landmark, CheckCircle2, XCircle } from "lucide-react";
+import { Landmark, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import type { CashAccount } from "@/lib/database.types";
@@ -56,7 +56,8 @@ export default async function CashAccountsPage({ searchParams }: { searchParams:
                     </span>
                   </td>
                   <td>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end items-center gap-3">
+                      <Link href={`/cash-flow/accounts/${a.id}/edit`} title="Edit rekening"><Pencil size={14} /></Link>
                       <form action={toggleCashAccountActive.bind(null, a.id)}>
                         <button type="submit" className="text-xs inline-flex items-center gap-1" style={{ color: a.is_active ? "var(--neg)" : "var(--pos)" }}>
                           {a.is_active ? <><XCircle size={14} /> Nonaktifkan</> : <><CheckCircle2 size={14} /> Aktifkan</>}

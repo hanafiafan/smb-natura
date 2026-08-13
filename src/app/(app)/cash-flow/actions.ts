@@ -34,8 +34,12 @@ async function parseAndPack(formData: FormData) {
   return { error: null, fieldErrors: null, data: parsed.data };
 }
 
-async function cashAccountBelongsToBrand(accountId: number, brandId: number): Promise<boolean> {
-  const [account] = await sql<{ id: number }[]>`select id from cash_accounts where id = ${accountId} and brand_id = ${brandId}`;
+/** requireActive=false lets an update keep an entry's existing (now-deactivated)
+ * account — only a genuinely new account choice must still be active. */
+async function cashAccountBelongsToBrand(accountId: number, brandId: number, requireActive: boolean): Promise<boolean> {
+  const [account] = await sql<{ id: number }[]>`
+    select id from cash_accounts where id = ${accountId} and brand_id = ${brandId} ${requireActive ? sql`and is_active` : sql``}
+  `;
   return !!account;
 }
 
@@ -45,16 +49,20 @@ export async function createCashFlowEntry(_prev: ActionState, formData: FormData
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
-  if (data.account_id && !(await cashAccountBelongsToBrand(data.account_id, brandId))) {
-    return { error: "Rekening tidak ditemukan di brand ini." };
+  if (data.account_id && !(await cashAccountBelongsToBrand(data.account_id, brandId, true))) {
+    return { error: "Rekening tidak ditemukan atau sudah nonaktif di brand ini." };
   }
 
-  await sql`
-    insert into cash_flow_entries ${sql(
-      { ...data, brand_id: brandId },
-      "brand_id", "entry_date", "description", "channel", "account_id", "type", "amount",
-    )}
-  `;
+  try {
+    await sql`
+      insert into cash_flow_entries ${sql(
+        { ...data, brand_id: brandId },
+        "brand_id", "entry_date", "description", "channel", "account_id", "type", "amount",
+      )}
+    `;
+  } catch {
+    return { error: "Gagal menyimpan catatan. Coba lagi." };
+  }
 
   revalidatePath("/cash-flow");
   redirect("/cash-flow?ok=created");
@@ -66,14 +74,25 @@ export async function updateCashFlowEntry(id: string, _prev: ActionState, formDa
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
-  if (data.account_id && !(await cashAccountBelongsToBrand(data.account_id, brandId))) {
-    return { error: "Rekening tidak ditemukan di brand ini." };
+
+  const [existing] = await sql<{ account_id: number | null }[]>`
+    select account_id from cash_flow_entries where id = ${id} and brand_id = ${brandId}
+  `;
+  if (!existing) return { error: "Catatan tidak ditemukan." };
+
+  const requireActive = !!data.account_id && data.account_id !== existing.account_id;
+  if (data.account_id && !(await cashAccountBelongsToBrand(data.account_id, brandId, requireActive))) {
+    return { error: "Rekening tidak ditemukan atau sudah nonaktif di brand ini." };
   }
 
-  await sql`
-    update cash_flow_entries set ${sql(data, "entry_date", "description", "channel", "account_id", "type", "amount")}
-    where id = ${id} and brand_id = ${brandId}
-  `;
+  try {
+    await sql`
+      update cash_flow_entries set ${sql(data, "entry_date", "description", "channel", "account_id", "type", "amount")}
+      where id = ${id} and brand_id = ${brandId}
+    `;
+  } catch {
+    return { error: "Gagal menyimpan perubahan. Coba lagi." };
+  }
 
   revalidatePath("/cash-flow");
   redirect("/cash-flow?ok=updated");

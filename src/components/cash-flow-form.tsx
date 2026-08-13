@@ -132,7 +132,7 @@ export function CashFlowForm({
             <select id="account_id" name="account_id" className="select" defaultValue={entry?.account_id ?? ""}>
               <option value="">— Pilih rekening —</option>
               {accounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
+                <option key={a.id} value={a.id}>{a.name}{!a.is_active ? " (nonaktif)" : ""}</option>
               ))}
             </select>
             <p className="text-[11px] mt-1 text-gray-500">

@@ -1,8 +1,8 @@
 import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import type { CashFlowEntry } from "@/lib/database.types";
-import { toCsv, csvResponse } from "@/lib/csv";
-import { fmtDate, firstOfMonth, lastOfMonth } from "@/lib/format";
+import { toCsv, csvResponse, csvText } from "@/lib/csv";
+import { fmtDate, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -11,8 +11,8 @@ export async function GET(request: Request) {
   if (!brandId) return new Response("No active brand", { status: 400 });
 
   const sp = Object.fromEntries(new URL(request.url).searchParams);
-  const start = sp.start ?? firstOfMonth();
-  const end = sp.end ?? lastOfMonth();
+  const start = safeISODate(sp.start, firstOfMonth());
+  const end = safeISODate(sp.end, lastOfMonth());
   const q = sp.q?.trim();
 
   const conditions = [sql`cfe.brand_id = ${brandId}`, sql`cfe.entry_date >= ${start}`, sql`cfe.entry_date <= ${end}`];
@@ -30,9 +30,9 @@ export async function GET(request: Request) {
     ["Tanggal", "Keterangan", "Channel", "Akun", "Jenis", "Jumlah"],
     ...entries.map((e) => [
       fmtDate(e.entry_date),
-      e.description,
-      e.channel ?? "",
-      e.account_name ?? "",
+      csvText(e.description),
+      csvText(e.channel),
+      csvText(e.account_name),
       e.type === "in" ? "Masuk" : "Keluar",
       Math.round(Number(e.amount)),
     ]),

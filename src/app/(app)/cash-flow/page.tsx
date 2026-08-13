@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { CashFlowEntry } from "@/lib/database.types";
-import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth } from "@/lib/format";
+import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
 import { DeleteCashFlowBtn } from "@/components/delete-cashflow-btn";
 import { BrandFilterCard } from "@/components/brand-filter";
 
@@ -16,8 +16,8 @@ type SP = { start?: string; end?: string; q?: string; page?: string; ok?: string
 
 export default async function CashFlowPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const start = sp.start ?? firstOfMonth();
-  const end = sp.end ?? lastOfMonth();
+  const start = safeISODate(sp.start, firstOfMonth());
+  const end = safeISODate(sp.end, lastOfMonth());
   const page = Math.max(1, Number(sp.page ?? "1"));
   const from = (page - 1) * PAGE_SIZE;
   const q = sp.q?.trim();
