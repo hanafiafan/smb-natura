@@ -38,11 +38,12 @@ export default async function NewUserPage({
           <label className="label" htmlFor="role">Role</label>
           <select id="role" name="role" className="select" defaultValue="brand_admin">
             <option value="brand_admin">Admin Brand — akses brand tertentu saja</option>
+            <option value="viewer">View Only — lihat saja, tidak bisa ubah data</option>
             <option value="super_admin">Super Admin — akses semua perusahaan & brand</option>
           </select>
         </div>
         <div>
-          <label className="label">Brand yang bisa diakses <span className="text-gray-400 font-normal normal-case">(khusus role Admin Brand)</span></label>
+          <label className="label">Brand yang bisa diakses <span className="text-gray-400 font-normal normal-case">(khusus role Admin Brand & View Only)</span></label>
           {brands.length === 0 ? (
             <p className="text-xs" style={{ color: "var(--muted)" }}>Belum ada brand — buat brand dulu.</p>
           ) : (

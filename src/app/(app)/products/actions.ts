@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { assertCanWrite, getSession } from "@/lib/session";
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -20,6 +20,7 @@ const ProductSchema = z.object({
 
 export async function createProduct(formData: FormData) {
   const session = await getSession();
+  assertCanWrite(session);
   const parsed = ProductSchema.safeParse({
     sku: formData.get("sku"),
     name: formData.get("name"),
@@ -44,6 +45,7 @@ export async function createProduct(formData: FormData) {
 
 export async function updateProduct(id: number, formData: FormData) {
   const session = await getSession();
+  assertCanWrite(session);
   const parsed = ProductSchema.safeParse({
     sku: formData.get("sku"),
     name: formData.get("name"),
@@ -69,6 +71,7 @@ export async function updateProduct(id: number, formData: FormData) {
 
 export async function toggleProductActive(id: number) {
   const session = await getSession();
+  assertCanWrite(session);
   await sql`
     update products set is_active = not is_active
     where id = ${id} and brand_id = ${session.activeBrandId!}

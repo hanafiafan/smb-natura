@@ -108,7 +108,7 @@ export async function deleteCompany(companyId: number) {
 const UserSchema = z.object({
   email: z.email(),
   password: z.string().min(6, "Password minimal 6 karakter"),
-  role: z.enum(["super_admin", "brand_admin"]),
+  role: z.enum(["super_admin", "brand_admin", "viewer"]),
   brand_ids: z.array(z.coerce.number().int()).optional(),
 });
 
@@ -121,8 +121,8 @@ export async function createUser(formData: FormData) {
     brand_ids: formData.getAll("brand_ids"),
   });
   if (!parsed.success) fail("/master-data/users/new", parsed.error.issues[0].message);
-  if (parsed.data.role === "brand_admin" && !parsed.data.brand_ids?.length) {
-    fail("/master-data/users/new", "Pilih minimal 1 brand untuk Admin Brand.");
+  if (parsed.data.role !== "super_admin" && !parsed.data.brand_ids?.length) {
+    fail("/master-data/users/new", "Pilih minimal 1 brand.");
   }
 
   const passwordHash = hashPassword(parsed.data.password);
@@ -139,7 +139,7 @@ export async function createUser(formData: FormData) {
     fail("/master-data/users/new", "Gagal membuat pengguna. Coba lagi.");
   }
 
-  if (parsed.data.role === "brand_admin" && parsed.data.brand_ids?.length) {
+  if (parsed.data.role !== "super_admin" && parsed.data.brand_ids?.length) {
     for (const brandId of parsed.data.brand_ids) {
       await sql`insert into user_brands (user_id, brand_id) values (${userId}, ${brandId})`;
     }
@@ -152,7 +152,7 @@ export async function createUser(formData: FormData) {
 const UserUpdateSchema = z.object({
   email: z.email(),
   password: z.union([z.string().length(0), z.string().min(6, "Password minimal 6 karakter")]),
-  role: z.enum(["super_admin", "brand_admin"]),
+  role: z.enum(["super_admin", "brand_admin", "viewer"]),
   brand_ids: z.array(z.coerce.number().int()).optional(),
 });
 
@@ -174,8 +174,8 @@ export async function updateUser(id: string, formData: FormData) {
     brand_ids: formData.getAll("brand_ids"),
   });
   if (!parsed.success) fail(`/master-data/users/${id}/edit`, parsed.error.issues[0].message);
-  if (parsed.data.role === "brand_admin" && !parsed.data.brand_ids?.length) {
-    fail(`/master-data/users/${id}/edit`, "Pilih minimal 1 brand untuk Admin Brand.");
+  if (parsed.data.role !== "super_admin" && !parsed.data.brand_ids?.length) {
+    fail(`/master-data/users/${id}/edit`, "Pilih minimal 1 brand.");
   }
 
   const [current] = await sql<{ role: string }[]>`select role from users where id = ${id}`;
@@ -196,7 +196,7 @@ export async function updateUser(id: string, formData: FormData) {
   }
 
   await sql`delete from user_brands where user_id = ${id}`;
-  if (parsed.data.role === "brand_admin" && parsed.data.brand_ids?.length) {
+  if (parsed.data.role !== "super_admin" && parsed.data.brand_ids?.length) {
     for (const brandId of parsed.data.brand_ids) {
       await sql`insert into user_brands (user_id, brand_id) values (${id}, ${brandId})`;
     }

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { assertCanWrite, getSession } from "@/lib/session";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const PeriodSchema = z.object({
@@ -20,6 +20,7 @@ function fail(periodStart: string | null, periodEnd: string | null, message: str
 
 export async function saveBudgetTargets(formData: FormData) {
   const session = await getSession();
+  assertCanWrite(session);
   const brandId = session.activeBrandId!;
 
   const periodParsed = PeriodSchema.safeParse({

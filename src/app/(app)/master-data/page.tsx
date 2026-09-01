@@ -18,7 +18,7 @@ type CompanyWithBrands = {
 type UserRow = {
   id: string;
   email: string;
-  role: "super_admin" | "brand_admin";
+  role: "super_admin" | "brand_admin" | "viewer";
   brand_names: string[];
 };
 
@@ -33,7 +33,7 @@ export default async function MasterDataPage({ searchParams }: { searchParams: P
       left join brands b on b.company_id = c.id
       order by c.name, b.name
     `,
-    sql<{ id: string; email: string; role: "super_admin" | "brand_admin"; brand_name: string | null }[]>`
+    sql<{ id: string; email: string; role: "super_admin" | "brand_admin" | "viewer"; brand_name: string | null }[]>`
       select u.id, u.email, u.role, b.name as brand_name
       from users u
       left join user_brands ub on ub.user_id = u.id
@@ -155,7 +155,7 @@ export default async function MasterDataPage({ searchParams }: { searchParams: P
               {users.map((u) => (
                 <tr key={u.id} className="item">
                   <td style={{ paddingLeft: 12 }}>{u.email}</td>
-                  <td>{u.role === "super_admin" ? "Super Admin" : "Admin Brand"}</td>
+                  <td>{u.role === "super_admin" ? "Super Admin" : u.role === "viewer" ? "View Only" : "Admin Brand"}</td>
                   <td>{u.brand_names.join(", ") || "—"}</td>
                   <td>
                     <div className="flex gap-3 justify-end">

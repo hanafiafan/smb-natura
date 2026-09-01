@@ -6,7 +6,7 @@ export type AccountSection =
   | "non_op_expense"
   | "tax";
 
-export type UserRole = "super_admin" | "brand_admin";
+export type UserRole = "super_admin" | "brand_admin" | "viewer";
 
 export type Company = {
   id: number;

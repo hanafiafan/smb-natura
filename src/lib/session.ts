@@ -34,6 +34,14 @@ export async function requireSuperAdmin(): Promise<IronSession<SessionData>> {
   return session;
 }
 
+/** Blocks viewer-role accounts from mutating actions. Call right after getSession()
+ * at the top of every create/update/delete server action. */
+export function assertCanWrite(session: SessionData): void {
+  if (session.role === "viewer") {
+    throw new Error("Akun view-only tidak bisa mengubah data.");
+  }
+}
+
 /** password_hash format: "<saltHex>:<hashHex>", generated via scryptSync. */
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);

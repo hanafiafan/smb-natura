@@ -50,6 +50,7 @@ psql "$DATABASE_URL" -f db/migrations/005_login_lockout.sql
 psql "$DATABASE_URL" -f db/migrations/006_cash_accounts.sql
 psql "$DATABASE_URL" -f db/migrations/007_products.sql
 psql "$DATABASE_URL" -f db/migrations/008_budget_targets.sql
+psql "$DATABASE_URL" -f db/migrations/009_viewer_role.sql
 ```
 
 Migrasi 003 otomatis membuat 1 perusahaan default ("CV Loka Bumi Persada") + 1 brand default ("Natura") dan memindahkan Chart of Accounts yang sudah ada ke brand itu — data lama tidak hilang.
