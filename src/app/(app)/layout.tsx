@@ -16,17 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session.email || !session.userId || !session.role) redirect("/login");
 
   // Re-check against the DB on every request — a session cookie lasts 30 days, so
-  // without this a deleted or demoted account would keep acting on stale cached
-  // role/identity until the cookie naturally expires.
+  // without this a deleted account would keep rendering as logged-in until the
+  // cookie naturally expires. Can't rewrite the cookie here to also fix a *demoted*
+  // account's stale role — Next only allows setting cookies from a Server Action or
+  // Route Handler, not a layout render — so every write-gating check re-reads the
+  // DB directly instead of trusting session.role (see requireSuperAdmin/assertCanWrite
+  // in src/lib/session.ts).
   const [dbUser] = await sql<{ role: UserRole }[]>`select role from users where id = ${session.userId}`;
-  if (!dbUser) {
-    session.destroy();
-    redirect("/login");
-  }
-  if (dbUser.role !== session.role) {
-    session.role = dbUser.role;
-    await session.save();
-  }
+  if (!dbUser) redirect("/login");
   const role = dbUser.role;
 
   const brands = await getAccessibleBrands(session.userId, role);

@@ -48,7 +48,7 @@ export async function createCashFlowEntry(_prev: ActionState, formData: FormData
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
   const session = await getSession();
-  assertCanWrite(session);
+  await assertCanWrite(session);
   const brandId = session.activeBrandId!;
   if (data.account_id && !(await cashAccountBelongsToBrand(data.account_id, brandId, true))) {
     return { error: "Rekening tidak ditemukan atau sudah nonaktif di brand ini." };
@@ -74,7 +74,7 @@ export async function updateCashFlowEntry(id: string, _prev: ActionState, formDa
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
   const session = await getSession();
-  assertCanWrite(session);
+  await assertCanWrite(session);
   const brandId = session.activeBrandId!;
 
   const [existing] = await sql<{ account_id: number | null }[]>`
@@ -102,7 +102,7 @@ export async function updateCashFlowEntry(id: string, _prev: ActionState, formDa
 
 export async function deleteCashFlowEntry(id: string) {
   const session = await getSession();
-  assertCanWrite(session);
+  await assertCanWrite(session);
   await sql`delete from cash_flow_entries where id = ${id} and brand_id = ${session.activeBrandId!}`;
 
   revalidatePath("/cash-flow");

@@ -20,7 +20,7 @@ function fail(periodStart: string | null, periodEnd: string | null, message: str
 
 export async function saveBudgetTargets(formData: FormData) {
   const session = await getSession();
-  assertCanWrite(session);
+  await assertCanWrite(session);
   const brandId = session.activeBrandId!;
 
   const periodParsed = PeriodSchema.safeParse({

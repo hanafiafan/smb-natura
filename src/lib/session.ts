@@ -2,6 +2,7 @@ import { getIronSession, type IronSession, type SessionOptions } from "iron-sess
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { sql } from "@/lib/db";
 import type { UserRole } from "@/lib/database.types";
 
 export type SessionData = {
@@ -26,18 +27,28 @@ export async function getSession(): Promise<IronSession<SessionData>> {
   return getIronSession<SessionData>(await cookies(), sessionOptions);
 }
 
+/** Looks up the caller's role straight from the DB — a session cookie can only be
+ * rewritten from a Server Action/Route Handler, not from the page render that reads
+ * it, so the cookie's cached role can go stale the moment an admin is demoted. Every
+ * write-gating check re-reads the DB instead of trusting session.role. */
+async function currentRole(userId: string | undefined): Promise<UserRole | null> {
+  if (!userId) return null;
+  const [row] = await sql<{ role: UserRole }[]>`select role from users where id = ${userId}`;
+  return row?.role ?? null;
+}
+
 /** Redirects to /login if not authenticated, or to /master-data-only notice if not super admin. */
 export async function requireSuperAdmin(): Promise<IronSession<SessionData>> {
   const session = await getSession();
   if (!session.email) redirect("/login");
-  if (session.role !== "super_admin") redirect("/");
+  if ((await currentRole(session.userId)) !== "super_admin") redirect("/");
   return session;
 }
 
 /** Blocks viewer-role accounts from mutating actions. Call right after getSession()
  * at the top of every create/update/delete server action. */
-export function assertCanWrite(session: SessionData): void {
-  if (session.role === "viewer") {
+export async function assertCanWrite(session: SessionData): Promise<void> {
+  if ((await currentRole(session.userId)) === "viewer") {
     throw new Error("Akun view-only tidak bisa mengubah data.");
   }
 }
