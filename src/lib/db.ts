@@ -15,3 +15,9 @@ export const sql = globalThis.__sql ?? postgres(process.env.DATABASE_URL!, {
 });
 
 if (process.env.NODE_ENV !== "production") globalThis.__sql = sql;
+
+/** Wraps a user's search text into an ILIKE pattern with its wildcards neutralized —
+ * without this, searching "50%" or "PT_A" silently matches far more than typed. */
+export function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, FileSpreadsheet, Wallet, ArrowDownCircle, ArrowUpCircle, Landmark } from "lucide-react";
-import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { likePattern, sql } from "@/lib/db";
+import { getCurrentRole, getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { CashFlowEntry } from "@/lib/database.types";
 import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
@@ -24,9 +24,10 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const canWrite = (await getCurrentRole()) !== "viewer";
 
   const conditions = [sql`cfe.brand_id = ${brandId}`, sql`cfe.entry_date >= ${start}`, sql`cfe.entry_date <= ${end}`];
-  if (q) conditions.push(sql`cfe.description ilike ${"%" + q + "%"}`);
+  if (q) conditions.push(sql`cfe.description ilike ${likePattern(q)}`);
   const where = conditions.reduce((acc, c) => sql`${acc} and ${c}`);
 
   const [[{ periodBalance, realtimeBalance }], [{ count }], entries, brands] = await Promise.all([
@@ -65,7 +66,7 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
           <a href={`/cash-flow/export?${exportQuery(sp)}`} className="btn-outline">
             <FileSpreadsheet size={16} /> Export Excel
           </a>
-          <Link href="/cash-flow/new" className="btn">+ Catat Arus Kas</Link>
+          {canWrite && <Link href="/cash-flow/new" className="btn">+ Catat Arus Kas</Link>}
         </div>
       </div>
 
@@ -152,8 +153,10 @@ export default async function CashFlowPage({ searchParams }: { searchParams: Pro
                   <td className="font-mono">{fmtRpFull(Number(e.amount))}</td>
                   <td>
                     <div className="flex gap-3 justify-end">
-                      <Link href={`/cash-flow/${e.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
-                      <DeleteCashFlowBtn id={e.id} />
+                      {canWrite && <>
+                        <Link href={`/cash-flow/${e.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
+                        <DeleteCashFlowBtn id={e.id} />
+                      </>}
                     </div>
                   </td>
                 </tr>

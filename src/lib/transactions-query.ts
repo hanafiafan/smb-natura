@@ -1,4 +1,4 @@
-import { sql } from "@/lib/db";
+import { likePattern, sql } from "@/lib/db";
 import type { Account, TransactionWithRelations } from "@/lib/database.types";
 
 export type TxnFilters = {
@@ -26,7 +26,7 @@ export async function queryTransactions(
   if (accountId != null && Number.isFinite(accountId)) conditions.push(sql`t.account_id = ${accountId}`);
 
   const q = filters.q?.trim();
-  if (q) conditions.push(sql`(t.description ilike ${"%" + q + "%"} or t.reference ilike ${"%" + q + "%"})`);
+  if (q) conditions.push(sql`(t.description ilike ${likePattern(q)} or t.reference ilike ${likePattern(q)})`);
 
   if (filters.category) {
     const idsInCat = accounts.filter((a) => (a.category ?? "") === filters.category).map((a) => a.id);

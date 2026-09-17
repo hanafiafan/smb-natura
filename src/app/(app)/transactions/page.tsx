@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getCurrentRole, getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { fmtRpFull, fmtDate, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
@@ -28,6 +28,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const canWrite = (await getCurrentRole()) !== "viewer";
 
   const [accounts, brands] = await Promise.all([
     sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order`,
@@ -59,7 +60,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
           <a href={`/transactions/export?${exportQuery(sp)}`} className="btn-outline">
             <FileSpreadsheet size={16} /> Export Excel
           </a>
-          <Link href="/transactions/new" className="btn">+ Catat Transaksi Baru</Link>
+          {canWrite && <Link href="/transactions/new" className="btn">+ Catat Transaksi Baru</Link>}
         </div>
       </div>
 
@@ -163,8 +164,10 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
                   <td className="font-mono">{fmtRpFull(Number(t.amount))}</td>
                   <td>
                     <div className="flex gap-3 justify-end">
-                      <Link href={`/transactions/${t.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
-                      <DeleteBtn id={t.id} />
+                      {canWrite && <>
+                        <Link href={`/transactions/${t.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
+                        <DeleteBtn id={t.id} />
+                      </>}
                     </div>
                   </td>
                 </tr>

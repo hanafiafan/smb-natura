@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Landmark, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getCurrentRole, getSession } from "@/lib/session";
 import type { CashAccount } from "@/lib/database.types";
 import { createCashAccount, toggleCashAccountActive } from "./actions";
 
@@ -11,6 +11,7 @@ export default async function CashAccountsPage({ searchParams }: { searchParams:
   const { error } = await searchParams;
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const canWrite = (await getCurrentRole()) !== "viewer";
 
   const accounts = await sql<CashAccount[]>`
     select * from cash_accounts where brand_id = ${brandId} order by name
@@ -28,13 +29,13 @@ export default async function CashAccountsPage({ searchParams }: { searchParams:
         <Link href="/cash-flow" className="btn-ghost text-sm">← Kembali</Link>
       </div>
 
-      <form action={createCashAccount} className="card p-5 flex items-end gap-3">
+      {canWrite && <form action={createCashAccount} className="card p-5 flex items-end gap-3">
         <div className="flex-1">
           <label className="label" htmlFor="name">Nama Rekening</label>
           <input id="name" name="name" type="text" className="input" placeholder="mis. BCA, Shopee Saldo, GoPay" required />
         </div>
         <button type="submit" className="btn">+ Tambah</button>
-      </form>
+      </form>}
       {error && (
         <div className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
           {decodeURIComponent(error)}
@@ -57,12 +58,13 @@ export default async function CashAccountsPage({ searchParams }: { searchParams:
                   </td>
                   <td>
                     <div className="flex justify-end items-center gap-3">
+                      {canWrite && <>
                       <Link href={`/cash-flow/accounts/${a.id}/edit`} title="Edit rekening"><Pencil size={14} /></Link>
                       <form action={toggleCashAccountActive.bind(null, a.id)}>
                         <button type="submit" className="text-xs inline-flex items-center gap-1" style={{ color: a.is_active ? "var(--neg)" : "var(--pos)" }}>
                           {a.is_active ? <><XCircle size={14} /> Nonaktifkan</> : <><CheckCircle2 size={14} /> Aktifkan</>}
                         </button>
-                      </form>
+                      </form></>}
                     </div>
                   </td>
                 </tr>

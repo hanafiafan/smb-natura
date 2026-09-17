@@ -1,22 +1,14 @@
-import { FileSpreadsheet } from "lucide-react";
-import { sql } from "@/lib/db";
+import { FileSpreadsheet, Layers, Building2 } from "lucide-react";
+import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { getAccessibleBrands } from "@/lib/brands";
-import type { Account } from "@/lib/database.types";
-import { aggregate, buildPnL, relevantAccounts, type PnLRow } from "@/lib/pnl";
-import { variance } from "@/lib/format";
+import { getAccessibleBrands, type AccessibleBrand } from "@/lib/brands";
+import { loadPnL, type PnLResult, type PnLRow } from "@/lib/pnl";
+import { parseISODateLocal, variance } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import { FilterBar } from "@/components/filter-bar";
 import { computePeriods, type PeriodMode } from "@/lib/period";
 
 export const metadata = { title: "Laporan Laba/Rugi — SMB Natura" };
-
-/** "YYYY-MM-DD" → local Date at midnight, avoiding the UTC-midnight-then-local-format
- * off-by-one that `new Date(iso)` produces in negative-UTC-offset timezones. */
-function parseISODateLocal(iso: string): Date {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
 
 /** Format IDR seperti PDF: `2.922.802.315,` atau `674.680.305,47` (Indonesian, trailing comma when integer) */
 function fmtIdrPdf(n: number): string {
@@ -60,37 +52,31 @@ function fmtColHeader(p: { start: string; end: string }): string {
 export default async function ReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; start?: string; end?: string }>;
+  searchParams: Promise<{ mode?: string; start?: string; end?: string; brand?: string }>;
 }) {
   const sp = await searchParams;
   const mode = (sp.mode ?? "monthly") as PeriodMode;
   const { periodA, periodB, summary } = computePeriods(mode, sp.start, sp.end);
 
-  const min = periodA.start < periodB.start ? periodA.start : periodB.start;
-  const max = periodA.end > periodB.end ? periodA.end : periodB.end;
-
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const brands = await getAccessibleBrands(session.userId!, session.role!);
 
-  const [allAccounts, brands, txns] = await Promise.all([
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
-    getAccessibleBrands(session.userId!, session.role!),
-    sql<{ account_id: number; txn_date: string; amount: number }[]>`
-      select account_id, txn_date, amount from transactions
-      where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
-    `,
-  ]);
-  const brand = brands.find((b) => b.id === brandId);
+  const allBrands = sp.brand === "all" && brands.length > 1;
+  // The app layout already refuses to render children when activeBrandId isn't in
+  // this list, so the lookup always resolves here.
+  const shown = allBrands ? brands : brands.filter((b) => b.id === brandId);
 
-  const aggs = aggregate(txns, periodA, periodB);
-  const pnl = buildPnL(relevantAccounts(allAccounts, aggs), aggs);
-
-  const omsetA = pnl.totals.netRevenue[0];
-  const omsetB = pnl.totals.netRevenue[1];
+  const sheets = await Promise.all(
+    shown.map(async (b) => ({ brand: b, pnl: await loadPnL(b.id, periodA, periodB) })),
+  );
 
   const colA = fmtColHeader(periodA);
   const colB = fmtColHeader(periodB);
   const rangeText = `${fmtDateRangePdf(periodA)} dan ${fmtDateRangePdf(periodB)}`;
+
+  const qs = new URLSearchParams({ mode, start: sp.start ?? periodB.start, end: sp.end ?? periodB.end });
+  if (allBrands) qs.set("brand", "all");
 
   return (
     <div className="space-y-6">
@@ -100,14 +86,21 @@ export default async function ReportPage({
           <div>
             <h1 className="text-xl font-bold">Laporan Laba/Rugi</h1>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-              {brand?.company_name} — {brand?.name} · {summary}
+              {allBrands
+                ? `${shown.length} brand, masing-masing terpisah`
+                : `${sheets[0]?.brand.company_name} — ${sheets[0]?.brand.name}`} · {summary}
             </p>
           </div>
           <div className="flex gap-2">
-            <a
-              href={`/report/export?mode=${mode}&start=${sp.start ?? periodB.start}&end=${sp.end ?? periodB.end}`}
-              className="btn-outline"
-            >
+            {brands.length > 1 && (
+              <Link
+                href={`/report?mode=${mode}&start=${sp.start ?? periodB.start}&end=${sp.end ?? periodB.end}${allBrands ? "" : "&brand=all"}`}
+                className="btn-outline"
+              >
+                {allBrands ? <><Building2 size={16} /> Brand Aktif Saja</> : <><Layers size={16} /> Semua Brand</>}
+              </Link>
+            )}
+            <a href={`/report/export?${qs}`} className="btn-outline">
               <FileSpreadsheet size={16} /> Export Excel
             </a>
             <PrintButton />
@@ -117,49 +110,82 @@ export default async function ReportPage({
 
       <FilterBar brands={brands} activeBrandId={brandId} />
 
-      {/* Report content — screen + print */}
-      <div className="report-sheet card p-8 print:p-0 print:border-0 print:shadow-none">
-        {/* Header block matching PDF */}
-        <div className="report-header mb-5 pb-4" style={{ borderBottom: "2px solid var(--color-gray-800)" }}>
-          <div className="text-[15px] font-bold text-gray-900">{brand?.company_name}</div>
-          <div className="text-[14px] text-gray-800 mt-0.5">Laporan Laba / Rugi — {brand?.name}</div>
-          <div className="text-[12px] text-gray-700 mt-1">Tanggal {rangeText}</div>
-          <div className="text-[12px] text-gray-700 mt-0.5">
-            Mata Uang : Indonesian Rupiah
-          </div>
-        </div>
+      {sheets.map(({ brand, pnl }, i) => (
+        <ReportSheet
+          key={brand.id}
+          brand={brand}
+          pnl={pnl}
+          colA={colA}
+          colB={colB}
+          rangeText={rangeText}
+          pageBreak={i > 0}
+        />
+      ))}
+    </div>
+  );
+}
 
-        <div className="overflow-x-auto">
-          <table className="pnl-print w-full">
-            <thead>
-              <tr>
-                <th className="text-left">Deskripsi</th>
-                <th>{colA}</th>
-                <th>% dari Omset {colA}</th>
-                <th>{colB}</th>
-                <th>% dari Omset {colB}</th>
-                <th>% Var.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pnl.rows.map((r, i) => renderRow(r, i, omsetA, omsetB))}
-            </tbody>
-          </table>
-        </div>
+function ReportSheet({
+  brand,
+  pnl,
+  colA,
+  colB,
+  rangeText,
+  pageBreak,
+}: {
+  brand: AccessibleBrand;
+  pnl: PnLResult;
+  colA: string;
+  colB: string;
+  rangeText: string;
+  pageBreak: boolean;
+}) {
+  const omsetA = pnl.totals.netRevenue[0];
+  const omsetB = pnl.totals.netRevenue[1];
 
-        {/* Catatan */}
-        <div className="mt-6 pt-4 text-[11px] text-gray-700 leading-relaxed" style={{ borderTop: "1px solid var(--color-gray-300)" }}>
-          <div className="font-bold text-gray-900 mb-1">Catatan:</div>
-          <p>
-            Laporan ini mencerminkan transaksi pendapatan dan beban operasional sesuai kebijakan tutup buku internal.
-          </p>
-          <p className="mt-1">
-            Data diambil dari sistem SMB Natura pada {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}.
-          </p>
-          <p className="mt-1">
-            Nilai dalam Rupiah (IDR). Tanda minus (−) menunjukkan pengurangan omset (retur/diskon) atau saldo negatif.
-          </p>
-        </div>
+  return (
+    <div
+      className="report-sheet card p-8 print:p-0 print:border-0 print:shadow-none"
+      style={pageBreak ? { breakBefore: "page" } : undefined}
+    >
+      {/* Header block matching PDF */}
+      <div className="report-header mb-5 pb-4" style={{ borderBottom: "2px solid var(--color-gray-800)" }}>
+        <div className="text-[15px] font-bold text-gray-900">{brand.company_name}</div>
+        <div className="text-[14px] text-gray-800 mt-0.5">Laporan Laba / Rugi — {brand.name}</div>
+        <div className="text-[12px] text-gray-700 mt-1">Tanggal {rangeText}</div>
+        <div className="text-[12px] text-gray-700 mt-0.5">Mata Uang : Indonesian Rupiah</div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="pnl-print w-full">
+          <thead>
+            <tr>
+              <th className="text-left">Deskripsi</th>
+              <th>{colA}</th>
+              <th>% dari Omset {colA}</th>
+              <th>{colB}</th>
+              <th>% dari Omset {colB}</th>
+              <th>% Var.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pnl.rows.map((r, i) => renderRow(r, i, omsetA, omsetB))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Catatan */}
+      <div className="mt-6 pt-4 text-[11px] text-gray-700 leading-relaxed" style={{ borderTop: "1px solid var(--color-gray-300)" }}>
+        <div className="font-bold text-gray-900 mb-1">Catatan:</div>
+        <p>
+          Laporan ini mencerminkan transaksi pendapatan dan beban operasional sesuai kebijakan tutup buku internal.
+        </p>
+        <p className="mt-1">
+          Data diambil dari sistem SMB Natura pada {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}.
+        </p>
+        <p className="mt-1">
+          Nilai dalam Rupiah (IDR). Tanda minus (−) menunjukkan pengurangan omset (retur/diskon) atau saldo negatif.
+        </p>
       </div>
     </div>
   );

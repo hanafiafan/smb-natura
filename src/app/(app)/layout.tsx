@@ -36,11 +36,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           companyName={activeBrand?.company_name}
           brandName={activeBrand?.name}
           isSuperAdmin={role === "super_admin"}
+          canWrite={role !== "viewer"}
         />
         <Backdrop />
         <div className="flex-1 flex flex-col min-w-0">
           <AppHeader email={session.email} brands={brands} activeBrandId={session.activeBrandId} />
           <main className="flex-1 p-4 md:p-6 max-w-[1536px] w-full mx-auto">
+            {role === "viewer" && (
+              <div className="card px-4 py-2.5 mb-4 text-xs no-print" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+                Akun ini <strong>view-only</strong> — kamu bisa melihat semua laporan, tapi tidak bisa menambah atau mengubah data.
+              </div>
+            )}
             {activeBrand ? children : brands.length > 0 ? (
               // Session's activeBrandId points at a brand that's gone/inactive/unassigned —
               // this can't rely on the header switcher, which hides itself when there's only

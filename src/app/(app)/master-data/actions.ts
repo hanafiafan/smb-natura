@@ -46,17 +46,19 @@ export async function createBrand(formData: FormData) {
   });
   if (!parsed.success) fail("/master-data/brands/new", parsed.error.issues[0].message);
 
-  const [brand] = await sql<{ id: number }[]>`
-    insert into brands (company_id, name) values (${parsed.data.company_id}, ${parsed.data.name}) returning id
-  `;
-
-  // Give every new brand its own starter Chart of Accounts. Uses a static template (not a
-  // copy of some other brand's live rows) so deleting/renaming any brand — Natura included —
-  // can never break COA seeding for brands created afterward.
-  const rows = COA_TEMPLATE.map((r) => ({ ...r, brand_id: brand.id, is_active: true }));
-  await sql`
-    insert into accounts ${sql(rows, "brand_id", "code", "name", "section", "category", "sign", "sort_order", "is_active")}
-  `;
+  // Brand + its starter Chart of Accounts in one transaction: a half-failed seed would
+  // leave a brand with no accounts at all, and the UI has no way to seed one after the
+  // fact. Uses a static template (not a copy of some other brand's live rows) so
+  // deleting/renaming any brand — Natura included — can never break later seeding.
+  await sql.begin(async (tx) => {
+    const [brand] = await tx<{ id: number }[]>`
+      insert into brands (company_id, name) values (${parsed.data.company_id}, ${parsed.data.name}) returning id
+    `;
+    const rows = COA_TEMPLATE.map((r) => ({ ...r, brand_id: brand.id, is_active: true }));
+    await tx`
+      insert into accounts ${tx(rows, "brand_id", "code", "name", "section", "category", "sign", "sort_order", "is_active")}
+    `;
+  });
 
   revalidatePath("/master-data");
   redirect("/master-data");
@@ -105,6 +107,14 @@ export async function deleteCompany(companyId: number) {
   revalidatePath("/master-data");
 }
 
+/** Form-supplied brand ids are only trusted after a round-trip — an unknown id would
+ * otherwise surface as a raw FK-violation 500 instead of a normal form error. */
+async function assertBrandsExist(ids: number[], failPath: string): Promise<void> {
+  if (!ids.length) return;
+  const rows = await sql<{ id: number }[]>`select id from brands where id in ${sql(ids)}`;
+  if (rows.length !== new Set(ids).size) fail(failPath, "Ada brand yang dipilih sudah tidak tersedia.");
+}
+
 const UserSchema = z.object({
   email: z.email(),
   password: z.string().min(6, "Password minimal 6 karakter"),
@@ -124,6 +134,7 @@ export async function createUser(formData: FormData) {
   if (parsed.data.role !== "super_admin" && !parsed.data.brand_ids?.length) {
     fail("/master-data/users/new", "Pilih minimal 1 brand.");
   }
+  await assertBrandsExist(parsed.data.brand_ids ?? [], "/master-data/users/new");
 
   const passwordHash = hashPassword(parsed.data.password);
   let userId: string;
@@ -140,9 +151,8 @@ export async function createUser(formData: FormData) {
   }
 
   if (parsed.data.role !== "super_admin" && parsed.data.brand_ids?.length) {
-    for (const brandId of parsed.data.brand_ids) {
-      await sql`insert into user_brands (user_id, brand_id) values (${userId}, ${brandId})`;
-    }
+    const links = parsed.data.brand_ids.map((brandId) => ({ user_id: userId, brand_id: brandId }));
+    await sql`insert into user_brands ${sql(links, "user_id", "brand_id")}`;
   }
 
   revalidatePath("/master-data");
@@ -177,6 +187,7 @@ export async function updateUser(id: string, formData: FormData) {
   if (parsed.data.role !== "super_admin" && !parsed.data.brand_ids?.length) {
     fail(`/master-data/users/${id}/edit`, "Pilih minimal 1 brand.");
   }
+  await assertBrandsExist(parsed.data.brand_ids ?? [], `/master-data/users/${id}/edit`);
 
   const [current] = await sql<{ role: string }[]>`select role from users where id = ${id}`;
   if (current?.role === "super_admin" && parsed.data.role !== "super_admin" && (await superAdminCount()) <= MIN_SUPER_ADMINS) {
@@ -197,9 +208,8 @@ export async function updateUser(id: string, formData: FormData) {
 
   await sql`delete from user_brands where user_id = ${id}`;
   if (parsed.data.role !== "super_admin" && parsed.data.brand_ids?.length) {
-    for (const brandId of parsed.data.brand_ids) {
-      await sql`insert into user_brands (user_id, brand_id) values (${id}, ${brandId})`;
-    }
+    const links = parsed.data.brand_ids.map((brandId) => ({ user_id: id, brand_id: brandId }));
+    await sql`insert into user_brands ${sql(links, "user_id", "brand_id")}`;
   }
 
   revalidatePath("/master-data");

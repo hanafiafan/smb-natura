@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getSession, requireWritePage } from "@/lib/session";
 import type { CashAccount, CashFlowEntry } from "@/lib/database.types";
 import { CashFlowForm } from "@/components/cash-flow-form";
 import { updateCashFlowEntry, type ActionState } from "../../actions";
@@ -9,6 +9,7 @@ import { updateCashFlowEntry, type ActionState } from "../../actions";
 export const metadata = { title: "Edit Arus Kas — SMB Natura" };
 
 export default async function EditCashFlowPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireWritePage();
   const { id } = await params;
   const session = await getSession();
 

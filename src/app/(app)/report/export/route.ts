@@ -1,7 +1,6 @@
-import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
-import type { Account } from "@/lib/database.types";
-import { aggregate, buildPnL, relevantAccounts, type PnLRow } from "@/lib/pnl";
+import { getAccessibleBrandId, getSession } from "@/lib/session";
+import { getAccessibleBrands } from "@/lib/brands";
+import { loadPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { computePeriods, type PeriodMode } from "@/lib/period";
 import { toCsv, csvResponse, numCell, csvText } from "@/lib/csv";
@@ -22,33 +21,30 @@ function toRow(r: PnLRow, omsetA: number, omsetB: number): (string | number)[] {
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session.email) return new Response("Unauthorized", { status: 401 });
-  const brandId = session.activeBrandId;
-  if (!brandId) return new Response("No active brand", { status: 400 });
+  const brandId = await getAccessibleBrandId(session);
+  if (!brandId) return new Response("No active brand", { status: 403 });
 
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const mode = (sp.mode ?? "monthly") as PeriodMode;
   const { periodA, periodB } = computePeriods(mode, sp.start, sp.end);
 
-  const min = periodA.start < periodB.start ? periodA.start : periodB.start;
-  const max = periodA.end > periodB.end ? periodA.end : periodB.end;
+  const brands = await getAccessibleBrands(session.userId!, session.role!);
+  const active = brands.find((b) => b.id === brandId)!;
+  const shown = sp.brand === "all" && brands.length > 1 ? brands : [active];
 
-  const [allAccounts, txns] = await Promise.all([
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
-    sql<{ account_id: number; txn_date: string; amount: number }[]>`
-      select account_id, txn_date, amount from transactions
-      where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
-    `,
-  ]);
+  const header = ["Deskripsi", periodA.start, "% Periode A", periodB.start, "% Periode B", "% Var"];
+  const rows: (string | number)[][] = [];
 
-  const aggs = aggregate(txns, periodA, periodB);
-  const pnl = buildPnL(relevantAccounts(allAccounts, aggs), aggs);
-  const omsetA = pnl.totals.netRevenue[0];
-  const omsetB = pnl.totals.netRevenue[1];
+  for (const b of shown) {
+    const pnl = await loadPnL(b.id, periodA, periodB);
+    const omsetA = pnl.totals.netRevenue[0];
+    const omsetB = pnl.totals.netRevenue[1];
+    if (rows.length) rows.push([]);
+    rows.push([csvText(`${b.company_name} — ${b.name}`), "", "", "", "", ""]);
+    rows.push(header);
+    rows.push(...pnl.rows.map((r) => toRow(r, omsetA, omsetB)));
+  }
 
-  const rows: (string | number)[][] = [
-    ["Deskripsi", periodA.start, "% Periode A", periodB.start, "% Periode B", "% Var"],
-    ...pnl.rows.map((r) => toRow(r, omsetA, omsetB)),
-  ];
-
-  return csvResponse(toCsv(rows), `laporan-lr-${periodB.start}_${periodB.end}.csv`);
+  const scope = shown.length > 1 ? "semua-brand-" : "";
+  return csvResponse(toCsv(rows), `laporan-lr-${scope}${periodB.start}_${periodB.end}.csv`);
 }

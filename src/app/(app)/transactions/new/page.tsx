@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getSession, requireWritePage } from "@/lib/session";
 import type { Account } from "@/lib/database.types";
 import { TxnForm } from "@/components/txn-form";
 import { createTransaction } from "../actions";
@@ -8,6 +8,7 @@ import { createTransaction } from "../actions";
 export const metadata = { title: "Catat Transaksi — SMB Natura" };
 
 export default async function NewTransactionPage() {
+  await requireWritePage();
   const session = await getSession();
   const accounts = await sql<Account[]>`select * from accounts where brand_id = ${session.activeBrandId!} and is_active = true order by sort_order`;
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, XCircle, Package } from "lucide-react";
-import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { likePattern, sql } from "@/lib/db";
+import { getCurrentRole, getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Product } from "@/lib/database.types";
 import { fmtRpFull } from "@/lib/format";
@@ -15,11 +15,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const q = sp.q?.trim();
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const canWrite = (await getCurrentRole()) !== "viewer";
 
   const [products, brands] = await Promise.all([
     q
       ? sql<Product[]>`
-          select * from products where brand_id = ${brandId} and (name ilike ${"%" + q + "%"} or sku ilike ${"%" + q + "%"})
+          select * from products where brand_id = ${brandId} and (name ilike ${likePattern(q)} or sku ilike ${likePattern(q)})
           order by name
         `
       : sql<Product[]>`select * from products where brand_id = ${brandId} order by name`,
@@ -35,7 +36,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             Master SKU, harga jual, dan HPP bahan baku.
           </p>
         </div>
-        <Link href="/products/new" className="btn">+ Tambah Produk</Link>
+        {canWrite && <Link href="/products/new" className="btn">+ Tambah Produk</Link>}
       </div>
 
       <BrandFilterCard brands={brands} activeBrandId={brandId} />
@@ -73,12 +74,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                   <td className="font-mono">{fmtRpFull(Number(p.cogs))}</td>
                   <td>
                     <div className="flex gap-3 justify-end items-center">
-                      <Link href={`/products/${p.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
+                      {canWrite && <><Link href={`/products/${p.id}/edit`} className="text-xs" style={{ color: "var(--accent)" }}>Edit</Link>
                       <form action={toggleProductActive.bind(null, p.id)}>
                         <button type="submit" className="text-xs inline-flex items-center gap-1" style={{ color: p.is_active ? "var(--neg)" : "var(--pos)" }}>
                           {p.is_active ? <><XCircle size={13} /> Nonaktifkan</> : <><CheckCircle2 size={13} /> Aktifkan</>}
                         </button>
-                      </form>
+                      </form></>}
                     </div>
                   </td>
                 </tr>

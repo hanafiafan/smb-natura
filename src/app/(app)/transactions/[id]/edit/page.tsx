@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getSession, requireWritePage } from "@/lib/session";
 import type { Account, Transaction } from "@/lib/database.types";
 import { TxnForm } from "@/components/txn-form";
 import { updateTransaction, type ActionState } from "../../actions";
@@ -9,6 +9,7 @@ import { updateTransaction, type ActionState } from "../../actions";
 export const metadata = { title: "Edit Transaksi — SMB Natura" };
 
 export default async function EditTransactionPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireWritePage();
   const { id } = await params;
   const session = await getSession();
   const brandId = session.activeBrandId!;

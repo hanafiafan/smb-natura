@@ -58,14 +58,20 @@ export async function login(formData: FormData) {
     await sql`update users set failed_attempts = ${RESET_STATE.failed_attempts}, locked_until = ${RESET_STATE.locked_until} where id = ${user.id}`;
   }
 
+  // Must match getAccessibleBrands' definition of "reachable" (is_active), otherwise a
+  // deactivated first brand drops the user straight onto the "pilih brand" screen even
+  // though they have other brands they can use.
   const activeBrandId =
     user.role === "super_admin"
-      ? (await sql<{ id: number }[]>`select id from brands order by id limit 1`)[0]?.id
+      ? (await sql<{ id: number }[]>`select id from brands where is_active order by id limit 1`)[0]?.id
       : (
-          await sql<{ brand_id: number }[]>`
-            select brand_id from user_brands where user_id = ${user.id} order by brand_id limit 1
+          await sql<{ id: number }[]>`
+            select b.id from brands b
+            join user_brands ub on ub.brand_id = b.id
+            where ub.user_id = ${user.id} and b.is_active
+            order by b.id limit 1
           `
-        )[0]?.brand_id;
+        )[0]?.id;
 
   const session = await getSession();
   session.userId = user.id;

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { getSession, requireSuperAdmin } from "@/lib/session";
+import { getSession, requireSuperAdmin, requireWriteAccess } from "@/lib/session";
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -50,7 +50,7 @@ async function canonicalCategory(brandId: number, section: string, category: str
 export async function createAccount(formData: FormData) {
   await requireSuperAdmin();
   const session = await getSession();
-  const brandId = session.activeBrandId!;
+  const brandId = await requireWriteAccess(session);
   const parsed = readForm(formData);
   if (!parsed.success) fail("/master-data/accounts", parsed.error.issues[0].message);
   const { section, code, name, sign } = parsed.data;
@@ -76,7 +76,7 @@ export async function createAccount(formData: FormData) {
 export async function updateAccount(id: number, formData: FormData) {
   await requireSuperAdmin();
   const session = await getSession();
-  const brandId = session.activeBrandId!;
+  const brandId = await requireWriteAccess(session);
   const parsed = readForm(formData);
   if (!parsed.success) fail(`/master-data/accounts/${id}/edit`, parsed.error.issues[0].message);
   const { section, code, name, sign } = parsed.data;
@@ -99,7 +99,8 @@ export async function updateAccount(id: number, formData: FormData) {
 export async function toggleAccountActive(id: number) {
   await requireSuperAdmin();
   const session = await getSession();
-  await sql`update accounts set is_active = not is_active where id = ${id} and brand_id = ${session.activeBrandId!}`;
+  const brandId = await requireWriteAccess(session);
+  await sql`update accounts set is_active = not is_active where id = ${id} and brand_id = ${brandId}`;
   revalidatePath("/master-data/accounts");
 }
 
@@ -108,8 +109,9 @@ export async function toggleAccountActive(id: number) {
 export async function deleteAccount(id: number) {
   await requireSuperAdmin();
   const session = await getSession();
+  const brandId = await requireWriteAccess(session);
   try {
-    await sql`delete from accounts where id = ${id} and brand_id = ${session.activeBrandId!}`;
+    await sql`delete from accounts where id = ${id} and brand_id = ${brandId}`;
   } catch (err) {
     if ((err as { code?: string }).code === "23503") {
       fail("/master-data/accounts", "Akun ini sudah dipakai di transaksi, tidak bisa dihapus. Nonaktifkan saja.");

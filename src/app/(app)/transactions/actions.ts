@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { assertCanWrite, getSession } from "@/lib/session";
+import { getSession, requireWriteAccess } from "@/lib/session";
 
 const TxnSchema = z.object({
   txn_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal tidak valid"),
@@ -46,8 +46,7 @@ export async function createTransaction(_prev: ActionState, formData: FormData):
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
   const session = await getSession();
-  await assertCanWrite(session);
-  const brandId = session.activeBrandId!;
+  const brandId = await requireWriteAccess(session);
   if (!(await accountBelongsToBrand(data.account_id, brandId, true))) {
     return { error: "Akun tidak ditemukan atau sudah nonaktif di brand ini." };
   }
@@ -70,8 +69,7 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
   if (!data) return { fieldErrors: fieldErrors ?? undefined, error: "Cek isian form." };
 
   const session = await getSession();
-  await assertCanWrite(session);
-  const brandId = session.activeBrandId!;
+  const brandId = await requireWriteAccess(session);
 
   const [existing] = await sql<{ account_id: number }[]>`
     select account_id from transactions where id = ${id} and brand_id = ${brandId}
@@ -99,8 +97,8 @@ export async function updateTransaction(id: string, _prev: ActionState, formData
 
 export async function deleteTransaction(id: string) {
   const session = await getSession();
-  await assertCanWrite(session);
-  await sql`delete from transactions where id = ${id} and brand_id = ${session.activeBrandId!}`;
+  const brandId = await requireWriteAccess(session);
+  await sql`delete from transactions where id = ${id} and brand_id = ${brandId}`;
 
   revalidatePath("/transactions");
   revalidatePath("/", "layout");

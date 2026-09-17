@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getCurrentRole, getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
-import { buildPnL, type PnLRow } from "@/lib/pnl";
+import { buildPnL, relevantAccounts, type PnLRow } from "@/lib/pnl";
 import { fmtRpFull, firstOfMonth, lastOfMonth, safeISODate } from "@/lib/format";
 import { saveBudgetTargets } from "./actions";
 import { BrandFilterCard } from "@/components/brand-filter";
@@ -28,9 +28,10 @@ export default async function AnggaranPage({
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const canWrite = (await getCurrentRole()) !== "viewer";
 
-  const [accounts, targets, txns, brands] = await Promise.all([
-    sql<Account[]>`select * from accounts where brand_id = ${brandId} and is_active = true order by sort_order asc`,
+  const [allAccounts, targets, txns, brands] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
     sql<{ account_id: number; target_amount: number }[]>`
       select account_id, target_amount from budget_targets
       where brand_id = ${brandId} and period_start = ${start} and period_end = ${end}
@@ -46,8 +47,16 @@ export default async function AnggaranPage({
   const realisasiMap = new Map<number, number>();
   for (const t of txns) realisasiMap.set(t.account_id, (realisasiMap.get(t.account_id) ?? 0) + Number(t.amount));
 
-  const aggs = accounts.map((a) => ({ account_id: a.id, a: targetMap.get(a.id) ?? 0, b: realisasiMap.get(a.id) ?? 0 }));
-  const pnl = buildPnL(accounts, aggs);
+  // Only accounts that actually carry a target or a realisasi count as "activity" —
+  // feeding relevantAccounts() an entry for every account would make it a no-op.
+  // Same rule as Laporan L/R: a mid-period deactivation must not drop its realisasi.
+  const aggs = allAccounts
+    .filter((a) => targetMap.has(a.id) || realisasiMap.has(a.id))
+    .map((a) => ({ account_id: a.id, a: targetMap.get(a.id) ?? 0, b: realisasiMap.get(a.id) ?? 0 }));
+  const pnl = buildPnL(relevantAccounts(allAccounts, aggs), aggs);
+
+  // The target form only offers active accounts — saveBudgetTargets rejects the rest anyway.
+  const accounts = allAccounts.filter((a) => a.is_active);
 
   return (
     <div className="space-y-6">
@@ -89,7 +98,7 @@ export default async function AnggaranPage({
         </div>
       </form>
 
-      <form action={saveBudgetTargets} className="card p-5 space-y-3">
+      {canWrite && <form action={saveBudgetTargets} className="card p-5 space-y-3">
         <input type="hidden" name="period_start" value={start} />
         <input type="hidden" name="period_end" value={end} />
         <h2 className="text-sm font-bold">Set Target per Akun</h2>
@@ -117,7 +126,7 @@ export default async function AnggaranPage({
           </table>
         </div>
         <button type="submit" className="btn">Simpan Target</button>
-      </form>
+      </form>}
 
       <div className="card p-5 overflow-x-auto">
         <h2 className="text-sm font-bold mb-3">Target vs Realisasi</h2>

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { assertCanWrite, getSession } from "@/lib/session";
+import { getSession, requireWriteAccess } from "@/lib/session";
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -20,7 +20,7 @@ const ProductSchema = z.object({
 
 export async function createProduct(formData: FormData) {
   const session = await getSession();
-  await assertCanWrite(session);
+  const brandId = await requireWriteAccess(session);
   const parsed = ProductSchema.safeParse({
     sku: formData.get("sku"),
     name: formData.get("name"),
@@ -32,7 +32,7 @@ export async function createProduct(formData: FormData) {
 
   try {
     await sql`
-      insert into products ${sql({ ...parsed.data, brand_id: session.activeBrandId! }, "brand_id", "sku", "name", "size_label", "price", "cogs")}
+      insert into products ${sql({ ...parsed.data, brand_id: brandId }, "brand_id", "sku", "name", "size_label", "price", "cogs")}
     `;
   } catch (err) {
     if ((err as { code?: string }).code === "23505") fail("/products/new", "SKU sudah dipakai produk lain di brand ini.");
@@ -45,7 +45,7 @@ export async function createProduct(formData: FormData) {
 
 export async function updateProduct(id: number, formData: FormData) {
   const session = await getSession();
-  await assertCanWrite(session);
+  const brandId = await requireWriteAccess(session);
   const parsed = ProductSchema.safeParse({
     sku: formData.get("sku"),
     name: formData.get("name"),
@@ -58,7 +58,7 @@ export async function updateProduct(id: number, formData: FormData) {
   try {
     await sql`
       update products set ${sql(parsed.data, "sku", "name", "size_label", "price", "cogs")}
-      where id = ${id} and brand_id = ${session.activeBrandId!}
+      where id = ${id} and brand_id = ${brandId}
     `;
   } catch (err) {
     if ((err as { code?: string }).code === "23505") fail(`/products/${id}/edit`, "SKU sudah dipakai produk lain di brand ini.");
@@ -71,10 +71,10 @@ export async function updateProduct(id: number, formData: FormData) {
 
 export async function toggleProductActive(id: number) {
   const session = await getSession();
-  await assertCanWrite(session);
+  const brandId = await requireWriteAccess(session);
   await sql`
     update products set is_active = not is_active
-    where id = ${id} and brand_id = ${session.activeBrandId!}
+    where id = ${id} and brand_id = ${brandId}
   `;
   revalidatePath("/products");
 }

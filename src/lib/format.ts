@@ -28,6 +28,14 @@ export function variance(a: number, b: number): number {
   return ((b - a) / Math.abs(a)) * 100;
 }
 
+/** "YYYY-MM-DD" → local Date at midnight. `new Date(iso)` parses a date-only string as
+ * UTC midnight, which then formats/shifts to the *previous* day in any negative-UTC-offset
+ * timezone — so every date-column value must go through here, never through new Date(). */
+export function parseISODateLocal(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Guards a `date`-column query param: a malformed value (bad shape, non-existent date
@@ -35,13 +43,17 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * unhandled "invalid input syntax for type date" 500, or land unsanitized in a CSV
  * export filename. Falls back silently instead of erroring the whole page/export. */
 export function safeISODate(value: string | undefined | null, fallback: string): string {
-  if (value && ISO_DATE_RE.test(value) && !isNaN(new Date(value).getTime())) return value;
-  return fallback;
+  if (!value || !ISO_DATE_RE.test(value)) return fallback;
+  // Round-trip guard: Date happily rolls a non-existent date over ("2026-02-30" becomes
+  // 2 Mar), so it never reads back as invalid — only comparing the components catches it.
+  const [y, m, d] = value.split("-").map(Number);
+  const parsed = parseISODateLocal(value);
+  const real = parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
+  return real ? value : fallback;
 }
 
 export function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  return parseISODateLocal(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function todayISO(d = new Date()): string {

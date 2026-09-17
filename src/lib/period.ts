@@ -1,4 +1,4 @@
-import { safeISODate } from "@/lib/format";
+import { parseISODateLocal, safeISODate } from "@/lib/format";
 
 export type PeriodMode = "daily" | "weekly" | "monthly" | "yearly" | "custom";
 
@@ -92,10 +92,13 @@ export function computePeriods(
   }
 
   if (mode === "custom") {
-    const startB = safeISODate(customStart, iso(t));
-    const endB = safeISODate(customEnd, iso(t));
-    const dB0 = new Date(startB);
-    const dB1 = new Date(endB);
+    const raw0 = safeISODate(customStart, iso(t));
+    const raw1 = safeISODate(customEnd, iso(t));
+    // A backwards range (end before start) is a mis-picked date, not an empty period —
+    // swap instead of silently reporting on a 1-day window the user never asked for.
+    const [startB, endB] = raw0 <= raw1 ? [raw0, raw1] : [raw1, raw0];
+    const dB0 = parseISODateLocal(startB);
+    const dB1 = parseISODateLocal(endB);
     const days = Math.max(1, Math.round((dB1.getTime() - dB0.getTime()) / 86_400_000) + 1);
     const dA1 = addDays(dB0, -1);
     const dA0 = addDays(dA1, -(days - 1));

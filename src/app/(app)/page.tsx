@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Wallet, TrendingUp, Activity, Sparkles, ArrowUpRight, ArrowDownRight, Star, Megaphone } from "lucide-react";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getCurrentRole, getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
 import type { Account } from "@/lib/database.types";
 import { aggregate, buildPnL, relevantAccounts } from "@/lib/pnl";
@@ -31,6 +31,7 @@ export default async function DashboardPage({
 
   const session = await getSession();
   const brandId = session.activeBrandId!;
+  const canWrite = (await getCurrentRole()) !== "viewer";
 
   const [allAccounts, txns, brands] = await Promise.all([
     sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
@@ -92,7 +93,7 @@ export default async function DashboardPage({
             {activeBrand?.company_name} — {activeBrand?.name} · {summary}
           </p>
         </div>
-        <Link href="/transactions/new" className="btn"><Sparkles size={16} /> Catat Transaksi</Link>
+        {canWrite && <Link href="/transactions/new" className="btn"><Sparkles size={16} /> Catat Transaksi</Link>}
       </div>
 
       <FilterBar brands={brands} activeBrandId={brandId} />
@@ -106,7 +107,7 @@ export default async function DashboardPage({
           <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>
             Tambahkan transaksi dulu untuk melihat laporan.
           </p>
-          <Link href="/transactions/new" className="btn">+ Catat Transaksi Baru</Link>
+          {canWrite && <Link href="/transactions/new" className="btn">+ Catat Transaksi Baru</Link>}
         </div>
       ) : (
         <>

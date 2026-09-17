@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getSession, requireWritePage } from "@/lib/session";
 import type { CashAccount } from "@/lib/database.types";
 import { updateCashAccount } from "../../actions";
 
@@ -14,6 +14,7 @@ export default async function EditCashAccountPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireWritePage();
   const { id } = await params;
   const { error } = await searchParams;
   const session = await getSession();

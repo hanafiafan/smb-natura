@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sql } from "@/lib/db";
-import { assertCanWrite, getSession } from "@/lib/session";
+import { getSession, requireWriteAccess } from "@/lib/session";
 
 function fail(message: string): never {
   redirect(`/cash-flow/accounts?error=${encodeURIComponent(message)}`);
@@ -22,8 +22,7 @@ async function nameTaken(brandId: number, name: string, excludeId?: number): Pro
 
 export async function createCashAccount(formData: FormData) {
   const session = await getSession();
-  await assertCanWrite(session);
-  const brandId = session.activeBrandId!;
+  const brandId = await requireWriteAccess(session);
   const parsed = CashAccountSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) fail(parsed.error.issues[0].message);
 
@@ -37,8 +36,7 @@ export async function createCashAccount(formData: FormData) {
 
 export async function updateCashAccount(id: number, formData: FormData) {
   const session = await getSession();
-  await assertCanWrite(session);
-  const brandId = session.activeBrandId!;
+  const brandId = await requireWriteAccess(session);
   const parsed = CashAccountSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) redirect(`/cash-flow/accounts/${id}/edit?error=${encodeURIComponent(parsed.error.issues[0].message)}`);
 
@@ -54,10 +52,10 @@ export async function updateCashAccount(id: number, formData: FormData) {
 
 export async function toggleCashAccountActive(id: number) {
   const session = await getSession();
-  await assertCanWrite(session);
+  const brandId = await requireWriteAccess(session);
   await sql`
     update cash_accounts set is_active = not is_active
-    where id = ${id} and brand_id = ${session.activeBrandId!}
+    where id = ${id} and brand_id = ${brandId}
   `;
   revalidatePath("/cash-flow/accounts");
 }

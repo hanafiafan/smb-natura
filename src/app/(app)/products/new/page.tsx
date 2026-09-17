@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { requireWritePage } from "@/lib/session";
 import { createProduct } from "../actions";
 
 export const metadata = { title: "Tambah Produk — SMB Natura" };
 
 export default async function NewProductPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  await requireWritePage();
   const { error } = await searchParams;
 
   return (

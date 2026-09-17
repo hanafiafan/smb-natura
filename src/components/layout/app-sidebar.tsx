@@ -33,10 +33,12 @@ export function AppSidebar({
   companyName,
   brandName,
   isSuperAdmin,
+  canWrite,
 }: {
   companyName?: string;
   brandName?: string;
   isSuperAdmin?: boolean;
+  canWrite?: boolean;
 }) {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
@@ -105,7 +107,7 @@ export function AppSidebar({
 
       <nav className="flex flex-col gap-6 overflow-y-auto no-scrollbar flex-1">
         {renderGroup("Menu", NAV_MAIN)}
-        {renderGroup("Cepat", NAV_QUICK)}
+        {canWrite && renderGroup("Cepat", NAV_QUICK)}
         {isSuperAdmin && renderGroup("Admin", NAV_ADMIN)}
         {renderGroup("Bantuan", NAV_HELP)}
       </nav>

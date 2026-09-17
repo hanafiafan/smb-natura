@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { getSession, requireWritePage } from "@/lib/session";
 import type { CashAccount } from "@/lib/database.types";
 import { CashFlowForm } from "@/components/cash-flow-form";
 import { createCashFlowEntry } from "../actions";
@@ -8,6 +8,7 @@ import { createCashFlowEntry } from "../actions";
 export const metadata = { title: "Catat Arus Kas — SMB Natura" };
 
 export default async function NewCashFlowPage() {
+  await requireWritePage();
   const session = await getSession();
   const accounts = await sql<CashAccount[]>`
     select * from cash_accounts where brand_id = ${session.activeBrandId!} and is_active order by name

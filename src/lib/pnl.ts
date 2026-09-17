@@ -1,3 +1,4 @@
+import { sql } from "@/lib/db";
 import type { Account, AccountSection } from "@/lib/database.types";
 
 export type AccountAgg = { account_id: number; a: number; b: number };
@@ -184,4 +185,24 @@ export function aggregate(
     map.set(t.account_id, cur);
   }
   return Array.from(map.values());
+}
+
+/** Fetch accounts + transactions for one brand and build its P&L. Shared by the
+ * report page and its CSV export so both stay in sync. */
+export async function loadPnL(
+  brandId: number,
+  periodA: { start: string; end: string },
+  periodB: { start: string; end: string },
+): Promise<PnLResult> {
+  const min = periodA.start < periodB.start ? periodA.start : periodB.start;
+  const max = periodA.end > periodB.end ? periodA.end : periodB.end;
+  const [allAccounts, txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = ${brandId} order by sort_order asc`,
+    sql<{ account_id: number; txn_date: string; amount: number }[]>`
+      select account_id, txn_date, amount from transactions
+      where brand_id = ${brandId} and txn_date >= ${min} and txn_date <= ${max}
+    `,
+  ]);
+  const aggs = aggregate(txns, periodA, periodB);
+  return buildPnL(relevantAccounts(allAccounts, aggs), aggs);
 }
