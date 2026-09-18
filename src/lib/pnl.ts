@@ -206,3 +206,47 @@ export async function loadPnL(
   const aggs = aggregate(txns, periodA, periodB);
   return buildPnL(relevantAccounts(allAccounts, aggs), aggs);
 }
+
+/** Merge per-brand account clones into one COA keyed by `code` (every brand gets its
+ * own copy of the same chart of accounts), summing each code's aggregates across
+ * brands. An account counts as active if it's active in any brand. */
+export function mergeByCode(accounts: Account[], aggs: AccountAgg[]): { accounts: Account[]; aggs: AccountAgg[] } {
+  const byCode = new Map<string, Account>();
+  const repOf = new Map<number, number>();
+  for (const acc of accounts) {
+    const rep = byCode.get(acc.code);
+    if (!rep) byCode.set(acc.code, acc);
+    else if (acc.is_active && !rep.is_active) byCode.set(acc.code, { ...rep, is_active: true });
+    repOf.set(acc.id, byCode.get(acc.code)!.id);
+  }
+  const merged = new Map<number, AccountAgg>();
+  for (const g of aggs) {
+    const id = repOf.get(g.account_id) ?? g.account_id;
+    const cur = merged.get(id) ?? { account_id: id, a: 0, b: 0 };
+    cur.a += Number(g.a);
+    cur.b += Number(g.b);
+    merged.set(id, cur);
+  }
+  return { accounts: Array.from(byCode.values()), aggs: Array.from(merged.values()) };
+}
+
+/** One consolidated P&L for several brands: totals (omset, HPP, laba kotor, beban
+ * operasional, laba bersih) are the sum across all of them, not one sheet per brand. */
+export async function loadCombinedPnL(
+  brandIds: number[],
+  periodA: { start: string; end: string },
+  periodB: { start: string; end: string },
+): Promise<PnLResult> {
+  if (brandIds.length === 1) return loadPnL(brandIds[0], periodA, periodB);
+  const min = periodA.start < periodB.start ? periodA.start : periodB.start;
+  const max = periodA.end > periodB.end ? periodA.end : periodB.end;
+  const [allAccounts, txns] = await Promise.all([
+    sql<Account[]>`select * from accounts where brand_id = any(${brandIds}) order by sort_order asc`,
+    sql<{ account_id: number; txn_date: string; amount: number }[]>`
+      select account_id, txn_date, amount from transactions
+      where brand_id = any(${brandIds}) and txn_date >= ${min} and txn_date <= ${max}
+    `,
+  ]);
+  const { accounts, aggs } = mergeByCode(allAccounts, aggregate(txns, periodA, periodB));
+  return buildPnL(relevantAccounts(accounts, aggs), aggs);
+}

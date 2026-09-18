@@ -1,6 +1,6 @@
 import { getAccessibleBrandId, getSession } from "@/lib/session";
 import { getAccessibleBrands } from "@/lib/brands";
-import { loadPnL, type PnLRow } from "@/lib/pnl";
+import { loadCombinedPnL, type PnLRow } from "@/lib/pnl";
 import { variance } from "@/lib/format";
 import { computePeriods, type PeriodMode } from "@/lib/period";
 import { toCsv, csvResponse, numCell, csvText } from "@/lib/csv";
@@ -33,18 +33,18 @@ export async function GET(request: Request) {
   const shown = sp.brand === "all" && brands.length > 1 ? brands : [active];
 
   const header = ["Deskripsi", periodA.start, "% Periode A", periodB.start, "% Periode B", "% Var"];
-  const rows: (string | number)[][] = [];
+  const pnl = await loadCombinedPnL(shown.map((b) => b.id), periodA, periodB);
+  const omsetA = pnl.totals.netRevenue[0];
+  const omsetB = pnl.totals.netRevenue[1];
+  const title = shown.length > 1
+    ? `Gabungan ${shown.length} Brand: ${shown.map((b) => b.name).join(", ")}`
+    : `${active.company_name} — ${active.name}`;
+  const rows: (string | number)[][] = [
+    [csvText(title), "", "", "", "", ""],
+    header,
+    ...pnl.rows.map((r) => toRow(r, omsetA, omsetB)),
+  ];
 
-  for (const b of shown) {
-    const pnl = await loadPnL(b.id, periodA, periodB);
-    const omsetA = pnl.totals.netRevenue[0];
-    const omsetB = pnl.totals.netRevenue[1];
-    if (rows.length) rows.push([]);
-    rows.push([csvText(`${b.company_name} — ${b.name}`), "", "", "", "", ""]);
-    rows.push(header);
-    rows.push(...pnl.rows.map((r) => toRow(r, omsetA, omsetB)));
-  }
-
-  const scope = shown.length > 1 ? "semua-brand-" : "";
+  const scope = shown.length > 1 ? "gabungan-" : "";
   return csvResponse(toCsv(rows), `laporan-lr-${scope}${periodB.start}_${periodB.end}.csv`);
 }

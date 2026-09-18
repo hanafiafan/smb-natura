@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aggregate, buildPnL, relevantAccounts, type AccountAgg } from "@/lib/pnl";
+import { aggregate, buildPnL, mergeByCode, relevantAccounts, type AccountAgg } from "@/lib/pnl";
 import type { Account, AccountSection } from "@/lib/database.types";
 
 let nextId = 1;
@@ -150,5 +150,36 @@ describe("aggregate", () => {
       periodB,
     );
     expect(row.b).toBe(1500);
+  });
+});
+
+describe("mergeByCode (laporan gabungan)", () => {
+  it("sums the same account code across brands into one row", () => {
+    const b1 = acc("revenue", "Penjualan", { id: 101, brand_id: 1, code: "4100" });
+    const b2 = acc("revenue", "Penjualan", { id: 201, brand_id: 2, code: "4100" });
+    const onlyB2 = acc("cogs", "Bahan Baku", { id: 202, brand_id: 2, code: "5100" });
+    const dead1 = acc("opex", "Iklan", { id: 103, brand_id: 1, code: "6100", is_active: false });
+    const live2 = acc("opex", "Iklan", { id: 203, brand_id: 2, code: "6100" });
+
+    const merged = mergeByCode([b1, b2, onlyB2, dead1, live2], [
+      { account_id: 101, a: 1000, b: 2000 },
+      { account_id: 201, a: 500, b: 700 },
+      { account_id: 202, a: 300, b: 400 },
+      { account_id: 203, a: 50, b: 60 },
+    ]);
+
+    expect(merged.accounts.map((a) => a.code)).toEqual(["4100", "5100", "6100"]);
+    expect(merged.aggs).toEqual([
+      { account_id: 101, a: 1500, b: 2700 }, // 1000+500, 2000+700
+      { account_id: 202, a: 300, b: 400 },
+      { account_id: 103, a: 50, b: 60 },
+    ]);
+    // inactive in brand 1 but active in brand 2 → kept as active
+    expect(merged.accounts.find((a) => a.code === "6100")!.is_active).toBe(true);
+
+    const { totals } = buildPnL(merged.accounts, merged.aggs);
+    expect(totals.netRevenue).toEqual([1500, 2700]);
+    expect(totals.cogs).toEqual([300, 400]);
+    expect(totals.netIncome).toEqual([1150, 2240]); // 1500-300-50, 2700-400-60
   });
 });

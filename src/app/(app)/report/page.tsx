@@ -1,8 +1,8 @@
 import { FileSpreadsheet, Layers, Building2 } from "lucide-react";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { getAccessibleBrands, type AccessibleBrand } from "@/lib/brands";
-import { loadPnL, type PnLResult, type PnLRow } from "@/lib/pnl";
+import { getAccessibleBrands } from "@/lib/brands";
+import { loadCombinedPnL, type PnLResult, type PnLRow } from "@/lib/pnl";
 import { parseISODateLocal, variance } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import { FilterBar } from "@/components/filter-bar";
@@ -67,9 +67,13 @@ export default async function ReportPage({
   // this list, so the lookup always resolves here.
   const shown = allBrands ? brands : brands.filter((b) => b.id === brandId);
 
-  const sheets = await Promise.all(
-    shown.map(async (b) => ({ brand: b, pnl: await loadPnL(b.id, periodA, periodB) })),
-  );
+  // Semua Brand = satu laporan gabungan (angka 5 brand dijumlahkan), bukan per brand.
+  const pnl = await loadCombinedPnL(shown.map((b) => b.id), periodA, periodB);
+  const companies = Array.from(new Set(shown.map((b) => b.company_name)));
+  const companyLabel = companies.length === 1 ? companies[0] : `${companies.length} Perusahaan`;
+  const brandLabel = allBrands
+    ? `Gabungan ${shown.length} Brand (${shown.map((b) => b.name).join(", ")})`
+    : shown[0].name;
 
   const colA = fmtColHeader(periodA);
   const colB = fmtColHeader(periodB);
@@ -87,8 +91,8 @@ export default async function ReportPage({
             <h1 className="text-xl font-bold">Laporan Laba/Rugi</h1>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
               {allBrands
-                ? `${shown.length} brand, masing-masing terpisah`
-                : `${sheets[0]?.brand.company_name} — ${sheets[0]?.brand.name}`} · {summary}
+                ? `Total gabungan ${shown.length} brand`
+                : `${companyLabel} — ${brandLabel}`} · {summary}
             </p>
           </div>
           <div className="flex gap-2">
@@ -97,7 +101,7 @@ export default async function ReportPage({
                 href={`/report?mode=${mode}&start=${sp.start ?? periodB.start}&end=${sp.end ?? periodB.end}${allBrands ? "" : "&brand=all"}`}
                 className="btn-outline"
               >
-                {allBrands ? <><Building2 size={16} /> Brand Aktif Saja</> : <><Layers size={16} /> Semua Brand</>}
+                {allBrands ? <><Building2 size={16} /> Brand Aktif Saja</> : <><Layers size={16} /> Gabungan Semua Brand</>}
               </Link>
             )}
             <a href={`/report/export?${qs}`} className="btn-outline">
@@ -110,48 +114,42 @@ export default async function ReportPage({
 
       <FilterBar brands={brands} activeBrandId={brandId} />
 
-      {sheets.map(({ brand, pnl }, i) => (
-        <ReportSheet
-          key={brand.id}
-          brand={brand}
-          pnl={pnl}
-          colA={colA}
-          colB={colB}
-          rangeText={rangeText}
-          pageBreak={i > 0}
-        />
-      ))}
+      <ReportSheet
+        companyLabel={companyLabel}
+        brandLabel={brandLabel}
+        pnl={pnl}
+        colA={colA}
+        colB={colB}
+        rangeText={rangeText}
+      />
     </div>
   );
 }
 
 function ReportSheet({
-  brand,
+  companyLabel,
+  brandLabel,
   pnl,
   colA,
   colB,
   rangeText,
-  pageBreak,
 }: {
-  brand: AccessibleBrand;
+  companyLabel: string;
+  brandLabel: string;
   pnl: PnLResult;
   colA: string;
   colB: string;
   rangeText: string;
-  pageBreak: boolean;
 }) {
   const omsetA = pnl.totals.netRevenue[0];
   const omsetB = pnl.totals.netRevenue[1];
 
   return (
-    <div
-      className="report-sheet card p-8 print:p-0 print:border-0 print:shadow-none"
-      style={pageBreak ? { breakBefore: "page" } : undefined}
-    >
+    <div className="report-sheet card p-8 print:p-0 print:border-0 print:shadow-none">
       {/* Header block matching PDF */}
       <div className="report-header mb-5 pb-4" style={{ borderBottom: "2px solid var(--color-gray-800)" }}>
-        <div className="text-[15px] font-bold text-gray-900">{brand.company_name}</div>
-        <div className="text-[14px] text-gray-800 mt-0.5">Laporan Laba / Rugi — {brand.name}</div>
+        <div className="text-[15px] font-bold text-gray-900">{companyLabel}</div>
+        <div className="text-[14px] text-gray-800 mt-0.5">Laporan Laba / Rugi — {brandLabel}</div>
         <div className="text-[12px] text-gray-700 mt-1">Tanggal {rangeText}</div>
         <div className="text-[12px] text-gray-700 mt-0.5">Mata Uang : Indonesian Rupiah</div>
       </div>
